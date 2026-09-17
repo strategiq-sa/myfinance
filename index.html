@@ -1223,7 +1223,12 @@ function mkSession(d){ return { access_token:d.access_token, refresh_token:d.ref
     expires_at:Date.now()+((d.expires_in||3600)*1000),
     user:{ id:(d.user&&d.user.id)||d.id||null, email:(d.user&&d.user.email)||'' } }; }
 
-function cfgUrl(){ return (state.settings.supaUrl||'').replace(/\/$/,''); }
+function normUrl(raw){
+  let u=(raw||'').trim().replace(/\s+/g,'');
+  u=u.replace(/\/+$/,'').replace(/\/(rest|auth)\/v1$/i,'').replace(/\/+$/,'');
+  return u;
+}
+function cfgUrl(){ return normUrl(state.settings.supaUrl); }
 function cfgKey(){ return state.settings.supaKey||''; }
 function configured(){ return !!(cfgUrl() && cfgKey()); }
 function loggedIn(){ return !!(session && session.access_token && session.user && session.user.id); }
@@ -1390,7 +1395,8 @@ function openSettings(){
 }
 function closeSettings(){ document.getElementById('settingsModal').classList.remove('show'); }
 async function saveSettings(){
-  state.settings.supaUrl=document.getElementById('supaUrl').value.trim();
+  state.settings.supaUrl=normUrl(document.getElementById('supaUrl').value);
+  document.getElementById('supaUrl').value=state.settings.supaUrl;
   state.settings.supaKey=document.getElementById('supaKey').value.trim();
   localStorage.setItem(LS,JSON.stringify(state));
   if(configured()){
