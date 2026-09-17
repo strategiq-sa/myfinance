@@ -576,20 +576,23 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
   <div class="modal">
     <div class="modal-h"><h3>Settings &amp; cloud sync</h3><button class="x" onclick="closeSettings()">×</button></div>
     <div class="modal-b">
-      <div class="callout">By default your data is saved <b>on this device only</b>. Connect a free <b>Supabase</b> database to sync across devices and require a <b>login</b> to open the app.</div>
-      <div class="frow"><label>1 · Supabase Project URL</label><input class="field" id="supaUrl" placeholder="https://xxxx.supabase.co"></div>
-      <div class="frow"><label>2 · Supabase public API key <span class="tiny" style="font-weight:600">(anon or publishable — both safe to paste)</span></label><input class="field" id="supaKey" placeholder="eyJ… or sb_publishable_… (public by design)"></div>
+      <div id="connNote" class="callout" style="display:none"></div>
+      <div id="connSetup">
+        <div class="callout">By default your data is saved <b>on this device only</b>. Connect a free <b>Supabase</b> database to sync across devices and require a <b>login</b> to open the app.</div>
+        <div class="frow"><label>1 · Supabase Project URL</label><input class="field" id="supaUrl" placeholder="https://xxxx.supabase.co"></div>
+        <div class="frow"><label>2 · Supabase public API key <span class="tiny" style="font-weight:600">(anon or publishable — both safe to paste)</span></label><input class="field" id="supaKey" placeholder="eyJ… or sb_publishable_… (public by design)"></div>
+        <details style="margin-top:12px">
+          <summary class="tiny" style="cursor:pointer; font-weight:700">3 · Show the setup SQL (run once in Supabase → SQL Editor)</summary>
+          <code class="sql" id="schemaSql"></code>
+        </details>
+        <p class="tiny">Never used Supabase before? I've written you a plain-English, step-by-step guide — just ask in the chat.</p>
+      </div>
       <div id="acctBox" class="acct-box"></div>
-      <details style="margin-top:12px">
-        <summary class="tiny" style="cursor:pointer; font-weight:700">3 · Show the setup SQL (run once in Supabase → SQL Editor)</summary>
-        <code class="sql" id="schemaSql"></code>
-      </details>
-      <p class="tiny">Never used Supabase before? I've written you a plain-English, step-by-step guide — just ask in the chat.</p>
     </div>
     <div class="modal-f">
       <button class="btn danger" id="disconnectBtn" onclick="disconnectCloud()" style="margin-right:auto">Disconnect</button>
-      <button class="btn ghost" onclick="closeSettings()">Cancel</button>
-      <button class="btn primary" onclick="saveSettings()">Save connection</button>
+      <button class="btn ghost" id="settingsCancel" onclick="closeSettings()">Cancel</button>
+      <button class="btn primary" id="saveConnBtn" onclick="saveSettings()">Save connection</button>
     </div>
   </div>
 </div>
@@ -608,7 +611,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
       <button class="btn primary" style="flex:1" onclick="authGateLogin()">Log in</button>
       <button class="btn ghost" style="flex:1" onclick="authGateSignup()">Create account</button>
     </div>
-    <button class="linkbtn" onclick="authOffline()">Use this device offline instead</button>
+    <button class="linkbtn" id="gateOffline" onclick="authOffline()">Use this device offline instead</button>
   </div>
 </div>
 
@@ -1223,13 +1226,18 @@ function mkSession(d){ return { access_token:d.access_token, refresh_token:d.ref
     expires_at:Date.now()+((d.expires_in||3600)*1000),
     user:{ id:(d.user&&d.user.id)||d.id||null, email:(d.user&&d.user.email)||'' } }; }
 
+/* --- Built-in Supabase connection (baked in so every visitor gets a login screen) --- */
+const BUILTIN_SUPA_URL='https://rkfmeseqfiyqroijgopn.supabase.co';
+const BUILTIN_SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJrZm1lc2VxZml5cXJvaWpnb3BuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxNjgxODcsImV4cCI6MjEwMzc0NDE4N30.kSIhxL-EManT7293R46jqqNPCDdR_W89tw4zgKEwSPE';
+const CLOUD_FORCED = !!(BUILTIN_SUPA_URL && BUILTIN_SUPA_KEY);
+
 function normUrl(raw){
   let u=(raw||'').trim().replace(/\s+/g,'');
   u=u.replace(/\/+$/,'').replace(/\/(rest|auth)\/v1$/i,'').replace(/\/+$/,'');
   return u;
 }
-function cfgUrl(){ return normUrl(state.settings.supaUrl); }
-function cfgKey(){ return state.settings.supaKey||''; }
+function cfgUrl(){ return normUrl(CLOUD_FORCED ? BUILTIN_SUPA_URL : state.settings.supaUrl); }
+function cfgKey(){ return CLOUD_FORCED ? BUILTIN_SUPA_KEY : (state.settings.supaKey||''); }
 function configured(){ return !!(cfgUrl() && cfgKey()); }
 function loggedIn(){ return !!(session && session.access_token && session.user && session.user.id); }
 function cloudOn(){ return configured() && loggedIn(); }
@@ -1323,7 +1331,8 @@ function showAuthGate(){
   const g=document.getElementById('authGate'); if(!g) return;
   const logo=document.getElementById('gateLogo'), hdr=document.querySelector('.logo-chip img');
   if(logo&&hdr) logo.src=hdr.src;
-  document.getElementById('gateProject').textContent = configured()?('Project: '+cfgUrl()):'';
+  document.getElementById('gateProject').textContent = CLOUD_FORCED ? '' : (configured()?('Project: '+cfgUrl()):'');
+  const off=document.getElementById('gateOffline'); if(off) off.style.display = CLOUD_FORCED?'none':'';
   gateMsg('');
   g.classList.add('show');
   setTimeout(()=>{ const e=document.getElementById('gateEmail'); if(e) e.focus(); },50);
@@ -1363,6 +1372,7 @@ async function afterLogin(){
   toast('Logged in ✓');
 }
 function authOffline(){
+  if(CLOUD_FORCED) return;   // this deployment is cloud-only — no offline bypass
   // stop using the cloud on this device and work locally
   saveSession(null); state.settings.supaUrl=''; state.settings.supaKey='';
   localStorage.setItem(LS,JSON.stringify(state));
@@ -1373,7 +1383,7 @@ function authOffline(){
 /* settings modal */
 function updateAuthUI(){
   const box=document.getElementById('acctBox'), dc=document.getElementById('disconnectBtn');
-  if(dc) dc.style.display = configured()?'':'none';
+  if(dc) dc.style.display = (CLOUD_FORCED || !configured())?'none':'';
   if(!box) return;
   if(!configured()){ box.innerHTML=''; return; }
   if(loggedIn()){
@@ -1390,6 +1400,19 @@ function openSettings(){
   document.getElementById('supaUrl').value=state.settings.supaUrl||'';
   document.getElementById('supaKey').value=state.settings.supaKey||'';
   document.getElementById('schemaSql').textContent=SCHEMA_SQL;
+  const setup=document.getElementById('connSetup'), note=document.getElementById('connNote'),
+        save=document.getElementById('saveConnBtn'), cancel=document.getElementById('settingsCancel');
+  if(CLOUD_FORCED){
+    if(setup) setup.style.display='none';
+    if(save) save.style.display='none';
+    if(cancel) cancel.textContent='Close';
+    if(note){ note.style.display=''; note.innerHTML='This app syncs to a shared <b>Supabase</b> cloud. Log in with your email and password to see your data on any device.'; }
+  }else{
+    if(setup) setup.style.display='';
+    if(save) save.style.display='';
+    if(cancel) cancel.textContent='Cancel';
+    if(note) note.style.display='none';
+  }
   updateAuthUI();
   document.getElementById('settingsModal').classList.add('show');
 }
