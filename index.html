@@ -232,6 +232,15 @@ tr.tot td{font-weight:800; background:var(--accent-soft); border-top:2px solid v
 .dropdown-menu button:hover{background:var(--chip)}
 .dropdown-menu .tiny{color:var(--muted); font-weight:600}
 
+/* column-mapping dialog */
+.map-grid{display:grid; gap:8px; margin-top:12px}
+.map-row{display:grid; grid-template-columns:1fr 1.1fr; align-items:center; gap:10px; font-size:13px; font-weight:600}
+.map-row.amt{padding-left:10px; border-left:3px solid var(--chip-line)}
+.map-row select{width:100%}
+.map-save{display:flex; align-items:center; gap:8px; margin-top:14px; font-size:13px; font-weight:600; flex-wrap:wrap}
+.map-save input[type=text],.map-save .field{max-width:190px; display:inline-block}
+.map-save input[type=checkbox]{width:16px; height:16px; accent-color:var(--brand)}
+
 /* tax-claimable picker */
 .claim-group{margin-bottom:14px}
 .claim-group:last-child{margin-bottom:0}
@@ -543,6 +552,11 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
         </div>
       </div>
       <div class="card pad" style="margin-top:16px">
+        <h3 style="margin-bottom:4px">Saved statement layouts</h3>
+        <p class="tiny" style="margin-bottom:12px">When you import a bank statement with a new column layout, MyFinances asks you to match the columns and can save that layout here so the same bank imports automatically next time.</p>
+        <div id="mappingsBox" style="display:grid; gap:8px"></div>
+      </div>
+      <div class="card pad" style="margin-top:16px">
         <h3 style="margin-bottom:6px">Data</h3>
         <p class="tiny" style="margin-bottom:12px">Reset everything back to the sample data, or wipe it clean and start fresh.</p>
         <div style="display:flex; gap:10px; flex-wrap:wrap">
@@ -612,6 +626,23 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
   </div>
 </div>
 
+<!-- Column-matching dialog for bank statements -->
+<div class="modal-bg" id="mapModal">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-h"><h3>Match your statement columns</h3><button class="x" onclick="closeMap()">×</button></div>
+    <div class="modal-b">
+      <p class="tiny">Tell MyFinances which of your file's columns is which — we've guessed where we can. Map <b>either</b> a single <b>Amount</b> column <b>or</b> the separate <b>Money in / Money out</b> columns (whichever your bank uses). Save it and next time this layout imports automatically.</p>
+      <div class="map-grid" id="mapGrid"></div>
+      <div class="callout" id="mapPreview" style="margin-top:12px"></div>
+      <label class="map-save"><input type="checkbox" id="mapSaveChk" checked> Save this layout as <input class="field" id="mapSaveName" placeholder="e.g. Capitec"></label>
+    </div>
+    <div class="modal-f">
+      <button class="btn ghost" onclick="closeMap()">Cancel</button>
+      <button class="btn primary" onclick="confirmMapping()">Import</button>
+    </div>
+  </div>
+</div>
+
 <!-- Login gate (shown when cloud is connected but nobody is logged in) -->
 <div class="gate" id="authGate">
   <div class="gate-card">
@@ -675,7 +706,9 @@ const DEFAULT_LISTS = {
   // Allocations you can claim against tax → the % of each that's claimable.
   // Keyed "Type::Allocation". Defaults to every deduction at 100%; add claimable
   // expenses (e.g. Retirement Annuity) at any % in Setup.
-  claimable: {'Deduction::Tax':100,'Deduction::Medical aid':100,'Deduction::UIF':100,'Deduction::SDL':100,'Deduction::Provident':100,'Deduction::Pension':100}
+  claimable: {'Deduction::Tax':100,'Deduction::Medical aid':100,'Deduction::UIF':100,'Deduction::SDL':100,'Deduction::Provident':100,'Deduction::Pension':100},
+  // Saved bank-statement column layouts, so each bank only has to be mapped once.
+  importMappings: []
 };
 
 let state = null;
@@ -703,6 +736,7 @@ function normalizeState(){
   if(!state.budgets) state.budgets = {};
   if(!state.lists) state.lists = JSON.parse(JSON.stringify(DEFAULT_LISTS));
   if(!state.lists.claimable) state.lists.claimable = {...DEFAULT_LISTS.claimable};
+  if(!Array.isArray(state.lists.importMappings)) state.lists.importMappings = [];
   // migrate old array-of-keys form → object keyed to percent (100% each)
   if(Array.isArray(state.lists.claimable)){
     const o={}; state.lists.claimable.forEach(k=>o[k]=100); state.lists.claimable=o;
@@ -1029,8 +1063,71 @@ function parseCsv(text){ importRows(csvRows(text)); }
 /* Turn a header+rows table (from CSV or Excel) into transactions.
    Understands the app's own export AND typical bank-statement layouts
    (Money In / Money Out / Fee, or Debit / Credit). */
-function importRows(rows){ addImported(rowsToTxns(rows)); }
+function importRows(rows){ beginTabularImport(rows); }
 function _num(x){ x=String(x==null?'':x).replace(/[^0-9.\-]/g,''); const n=parseFloat(x); return isNaN(n)?0:n; }
+
+/* Decide how to import a header+rows table:
+   1) our own export → straight in;  2) a layout you've saved → auto-apply;
+   3) anything new → open the column-matching dialog (pre-filled with guesses). */
+const MAP_NATIVE='date|description|type|allocation|amount|account|person|notes';
+function makeSig(header){ return header.map(h=>String(h==null?'':h).trim().toLowerCase()).join('|'); }
+function beginTabularImport(rows){
+  if(!rows||rows.length<2){ toast('No rows found — a header row plus data is needed',true); return; }
+  const header=rows[0].map(h=>String(h==null?'':h).trim());
+  const sig=makeSig(header);
+  if(sig===MAP_NATIVE){ addImported(rowsToTxns(rows)); return; }
+  const saved=(state.lists.importMappings||[]).find(m=>m.sig===sig);
+  if(saved){ addImported(applyMapping(rows,saved)); toast(`Used your “${saved.name}” layout`); return; }
+  openMapDialog(rows,header,sig);
+}
+function guessCols(header){
+  const H=header.map(h=>String(h||'').toLowerCase());
+  const find=(...names)=>{ for(const n of names){ const j=H.indexOf(n); if(j>=0) return header[j]; } return ''; };
+  return {
+    date:find('date','posting date','transaction date','value date'),
+    description:find('description','original description','narrative','details','reference'),
+    amount:find('amount','value'),
+    moneyIn:find('money in','credit','deposit','amount in'),
+    moneyOut:find('money out','debit','withdrawal','amount out'),
+    fee:find('fee','fees'),
+    type:find('type'),
+    allocation:find('allocation','category','sub category','parent category'),
+    account:find('account','account number','account name'),
+    person:find('person','who'),
+    notes:find('notes','memo')
+  };
+}
+/* build transactions from a saved/edited mapping (column NAMES → values) */
+function applyMapping(rows,m){
+  const header=rows[0].map(h=>String(h==null?'':h).trim().toLowerCase());
+  const idxOf=name=>{ name=String(name||'').trim().toLowerCase(); return name?header.indexOf(name):-1; };
+  const c=m.cols||{};
+  const jDate=idxOf(c.date), jDesc=idxOf(c.description), jType=idxOf(c.type),
+        jAmount=idxOf(c.amount), jIn=idxOf(c.moneyIn), jOut=idxOf(c.moneyOut), jFee=idxOf(c.fee),
+        jAlloc=idxOf(c.allocation), jAcct=idxOf(c.account), jPerson=idxOf(c.person), jNotes=idxOf(c.notes);
+  const split = (jIn>=0||jOut>=0||jFee>=0);
+  const g=(r,j)=> j>=0?String(r[j]==null?'':r[j]).trim():'';
+  const out=[];
+  for(let i=1;i<rows.length;i++){
+    const r=rows[i]||[]; if(!r.length||r.every(x=>!String(x==null?'':x).trim())) continue;
+    let type, amount;
+    if(split){
+      let signed=0;
+      if(jIn>=0) signed+=Math.abs(_num(g(r,jIn)));
+      if(jOut>=0) signed-=Math.abs(_num(g(r,jOut)));
+      if(jFee>=0) signed-=Math.abs(_num(g(r,jFee)));
+      if(signed===0) continue;
+      type=signed>=0?'Income':'Expense'; amount=Math.abs(signed);
+    }else{
+      const a=_num(g(r,jAmount));
+      if(jType>=0){ type=g(r,jType)||'Expense'; type=TYPES.find(t=>t.toLowerCase()===type.toLowerCase())||'Expense'; amount=Math.abs(a); }
+      else { type=a>=0?'Income':'Expense'; amount=Math.abs(a); }
+    }
+    out.push({ date:isoDate(g(r,jDate).split(' ')[0]), description:g(r,jDesc), type,
+               allocation:g(r,jAlloc), amount, account:g(r,jAcct), person:g(r,jPerson), notes:g(r,jNotes) });
+  }
+  return out;
+}
 function rowsToTxns(rows){
   if(!rows||rows.length<2) return null;
   const H=rows[0].map(h=>String(h==null?'':h).trim().toLowerCase());
@@ -1154,6 +1251,70 @@ function addImported(txns){
     added++;
   });
   save(); render(); toast(`Imported ${added} transaction(s)`);
+}
+
+/* ---------- Column-matching dialog (map a bank layout once, save it) ---------- */
+const MAP_FIELDS=[
+  ['date','Date', 'required'],
+  ['description','Description', ''],
+  ['amount','Amount (single column, + / –)', 'amt'],
+  ['moneyIn','Money in / Credit', 'amt'],
+  ['moneyOut','Money out / Debit', 'amt'],
+  ['fee','Fee', 'amt'],
+  ['type','Type column (Income/Expense)', ''],
+  ['allocation','Category / Allocation', ''],
+  ['account','Account', ''],
+  ['person','Person', ''],
+  ['notes','Notes', '']
+];
+let _mapCtx=null;   // { rows, header, sig }
+function openMapDialog(rows,header,sig){
+  _mapCtx={rows,header,sig};
+  const guess=guessCols(header);
+  const opts=(sel)=>['<option value="">— none —</option>']
+    .concat(header.map(h=>`<option value="${esc(h)}"${(String(sel).toLowerCase()===String(h).toLowerCase())?' selected':''}>${esc(h)}</option>`)).join('');
+  const grid=document.getElementById('mapGrid');
+  grid.innerHTML=MAP_FIELDS.map(([key,label,tag])=>{
+    return `<label class="map-row${tag==='amt'?' amt':''}"><span>${label}${tag==='required'?' <b style="color:var(--expense)">*</b>':''}</span>`+
+      `<select class="field" data-mapkey="${key}" onchange="mapPreview()">${opts(guess[key]||'')}</select></label>`;
+  }).join('');
+  document.getElementById('mapSaveChk').checked=true;
+  document.getElementById('mapSaveName').value='';
+  mapPreview();
+  document.getElementById('mapModal').classList.add('show');
+}
+function closeMap(){ document.getElementById('mapModal').classList.remove('show'); _mapCtx=null; }
+function readMapCols(){
+  const c={}; document.querySelectorAll('#mapGrid select').forEach(s=>{ c[s.dataset.mapkey]=s.value; }); return c;
+}
+function mapPreview(){
+  const box=document.getElementById('mapPreview'); if(!_mapCtx||!box) return;
+  const cols=readMapCols();
+  const txns=applyMapping(_mapCtx.rows,{cols});
+  if(!txns.length){ box.innerHTML='<span class="tiny">Map at least a <b>Date</b> and an amount column to see a preview.</span>'; return; }
+  const p=txns.slice(0,2).map(t=>`${esc(t.date||'?')} · ${esc((t.description||'').slice(0,32)||'—')} · <b>${t.type}</b> · ${fmt(t.amount)}`).join('<br>');
+  box.innerHTML=`<div class="tiny" style="margin-bottom:4px">Preview — first rows will import as:</div>${p}<div class="tiny" style="margin-top:6px">${txns.length} row(s) will import.</div>`;
+}
+function confirmMapping(){
+  if(!_mapCtx) return;
+  const cols=readMapCols();
+  if(!cols.date){ toast('Please choose which column is the Date',true); return; }
+  if(!cols.amount && !cols.moneyIn && !cols.moneyOut && !cols.fee){ toast('Map an Amount column, or Money in / Money out',true); return; }
+  const txns=applyMapping(_mapCtx.rows,{cols});
+  if(!txns.length){ toast('That mapping produced no transactions — check the columns',true); return; }
+  // save the layout for next time
+  if(document.getElementById('mapSaveChk').checked){
+    const name=(document.getElementById('mapSaveName').value||'').trim() || 'My bank';
+    const sig=_mapCtx.sig;
+    state.lists.importMappings = (state.lists.importMappings||[]).filter(m=>m.sig!==sig);
+    state.lists.importMappings.push({ id:uid(), name, sig, cols });
+  }
+  closeMap();
+  addImported(txns);
+}
+function removeMapping(id){
+  state.lists.importMappings=(state.lists.importMappings||[]).filter(m=>m.id!==id);
+  save(); renderSetup(); toast('Layout removed');
 }
 function csvRows(text){
   const rows=[]; let row=[],cur='',q=false;
@@ -1298,6 +1459,12 @@ function renderSetup(){
   chipBox('listAccounts', state.lists.accounts, i=>removeSimple('accounts',i));
   chipBox('listPersons', state.lists.persons, i=>removeSimple('persons',i));
   renderClaimable();
+  const mb=document.getElementById('mappingsBox');
+  if(mb){
+    const ms=state.lists.importMappings||[];
+    mb.innerHTML = ms.length ? ms.map(m=>`<div class="acct-line"><span>📄 <b>${esc(m.name)}</b> <span class="tiny">${(m.sig||'').split('|').length} columns</span></span><button class="btn ghost sm" style="margin-left:auto" onclick="removeMapping('${m.id}')">Remove</button></div>`).join('')
+      : '<p class="tiny">No saved layouts yet. They appear here after you map and save a bank statement during import.</p>';
+  }
   const un=document.getElementById('userNameInput'); if(un) un.value=(state.settings&&state.settings.userName)||'';
 }
 function setUserName(v){ if(!state.settings) state.settings={}; state.settings.userName=v; save(); renderGreeting(); }
