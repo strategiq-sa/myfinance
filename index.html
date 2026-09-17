@@ -419,6 +419,8 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
       <div class="filters no-print">
         <div class="fx"><label>Search</label><input class="field" id="txSearch" placeholder="Description, notes…" oninput="renderTxns()" style="min-width:200px"></div>
         <div class="fx"><label>Type</label><select class="field" id="txType" onchange="renderTxns()"><option>All</option><option>Income</option><option>Expense</option><option>Deduction</option></select></div>
+        <div class="fx"><label>Allocation</label><select class="field" id="txAlloc" onchange="renderTxns()"></select></div>
+        <div class="fx"><label>Account</label><select class="field" id="txAccount" onchange="renderTxns()"></select></div>
         <div class="fx"><label>Person</label><select class="field" id="txPerson" onchange="renderTxns()"></select></div>
         <div class="fx"><label>Month</label><select class="field" id="txMonth" onchange="renderTxns()"></select></div>
         <div class="flush">
@@ -539,12 +541,12 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
       </div>
       <div class="grid g2" style="margin-top:16px">
         <div class="card pad">
-          <h3 style="margin-bottom:4px">Accounts <span class="tiny">(Paid from)</span></h3>
+          <h3 style="margin-bottom:4px">Accounts <span class="tiny">(Paid from · max 10)</span></h3>
           <div class="chips" id="listAccounts"></div>
           <div class="add-inline"><input class="field" id="addAccount" placeholder="Add account…" style="flex:1"><button class="btn primary sm" onclick="addSimple('accounts','addAccount')">Add</button></div>
         </div>
         <div class="card pad">
-          <h3 style="margin-bottom:4px">People</h3>
+          <h3 style="margin-bottom:4px">People <span class="tiny">(max 3)</span></h3>
           <div class="chips" id="listPersons"></div>
           <div class="add-inline"><input class="field" id="addPerson" placeholder="Add person…" style="flex:1"><button class="btn primary sm" onclick="addSimple('persons','addPerson')">Add</button></div>
           <h3 style="margin:16px 0 4px">Your name <span class="tiny">(greeting on the Dashboard)</span></h3>
@@ -834,6 +836,8 @@ function refreshDropdowns(){
   fillSelect('fMonth', MONTHS, true);
   fillSelect('txPerson', state.lists.persons, true);
   fillSelect('txMonth', MONTHS, true);
+  fillSelect('txAlloc', allAllocations(), true);
+  fillSelect('txAccount', state.lists.accounts, true);
   fillSelect('tAccount', state.lists.accounts, false);
   fillSelect('tPerson', state.lists.persons, false);
   fillSelect('repPerson', ['All',...state.lists.persons], false);
@@ -927,9 +931,10 @@ function barList(id, list, color){
    ============================================================ */
 function renderTxns(){
   const q=(val('txSearch')||'').toLowerCase();
-  const ty=val('txType'), pe=val('txPerson'), mo=val('txMonth');
+  const ty=val('txType'), pe=val('txPerson'), mo=val('txMonth'), al=val('txAlloc'), ac=val('txAccount');
   let rows=state.transactions.filter(t=>
     (ty==='All'||t.type===ty)&&(pe==='All'||t.person===pe)&&(mo==='All'||monthOf(t.date)===mo)&&
+    (al==='All'||t.allocation===al)&&(ac==='All'||t.account===ac)&&
     (!q||(t.description||'').toLowerCase().includes(q)||(t.notes||'').toLowerCase().includes(q)||(t.allocation||'').toLowerCase().includes(q)));
   rows.sort((a,b)=> (a.date<b.date?1:a.date>b.date?-1:0));
   const body=document.getElementById('txBody');
@@ -1242,10 +1247,10 @@ function addImported(txns){
     if(alloc){ const L=state.lists.allocations[type]||(state.lists.allocations[type]=[]);
       if(!L.some(a=>a.toLowerCase()===alloc.toLowerCase())) L.push(alloc); }
     let acct=(t.account||'').trim();
-    if(acct){ if(!state.lists.accounts.some(a=>a.toLowerCase()===acct.toLowerCase())) state.lists.accounts.push(acct); }
+    if(acct){ if(!state.lists.accounts.some(a=>a.toLowerCase()===acct.toLowerCase())){ if(state.lists.accounts.length<LIST_LIMITS.accounts) state.lists.accounts.push(acct); } }
     else acct=state.lists.accounts[0]||'';
     const person=(t.person||'').trim()||defPerson;
-    if(person && !state.lists.persons.some(p=>p.toLowerCase()===person.toLowerCase())) state.lists.persons.push(person);
+    if(person && !state.lists.persons.some(p=>p.toLowerCase()===person.toLowerCase()) && state.lists.persons.length<LIST_LIMITS.persons) state.lists.persons.push(person);
     state.transactions.push({ id:uid(), date:t.date, description:t.description||'', type,
       allocation:alloc, amount:Math.abs(Number(t.amount))||0, account:acct, person, notes:t.notes||'' });
     added++;
@@ -1527,8 +1532,13 @@ function removeAlloc(type,i){
   const ck=ckey(type,name); if(claimMap()[ck]!==undefined) delete state.lists.claimable[ck];
   save(); renderSetup(); refreshDropdowns(); toast('Removed');
 }
+const LIST_LIMITS={accounts:10, persons:3};
 function addSimple(key,inputId){
   const inp=document.getElementById(inputId); const v=inp.value.trim(); if(!v) return;
+  const lim=LIST_LIMITS[key];
+  if(lim && state.lists[key].length>=lim && !state.lists[key].some(x=>x.toLowerCase()===v.toLowerCase())){
+    toast(`You can have at most ${lim} ${key==='accounts'?'bank accounts':'people'}`,true); return;
+  }
   if(!state.lists[key].includes(v)) state.lists[key].push(v);
   inp.value=''; save(); renderSetup(); refreshDropdowns(); toast('Added');
 }
