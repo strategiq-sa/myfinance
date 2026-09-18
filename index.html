@@ -195,13 +195,27 @@ tr.tot td{font-weight:800; background:var(--accent-soft); border-top:2px solid v
 @keyframes pop{from{opacity:0; transform:translateY(10px) scale(.98)}to{opacity:1}}
 .modal-h{padding:18px 20px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between}
 .modal-h h3{font-size:17px}
-.modal-b{padding:20px; display:grid; gap:14px}
+.modal-b{padding:20px; display:grid; gap:14px; max-height:72vh; overflow:auto}
 .modal-f{padding:16px 20px; border-top:1px solid var(--line); display:flex; gap:10px; justify-content:flex-end}
 .frow{display:grid; gap:6px}
 .frow.two{grid-template-columns:1fr 1fr; gap:14px}
 .frow label{font-size:12px; font-weight:700; color:var(--muted); letter-spacing:.03em}
 .frow .field{width:100%}
 .seg{display:flex; gap:0; border:1px solid var(--line); border-radius:10px; overflow:hidden}
+
+/* payslip entry */
+.ps-sect{border:1px solid var(--line); border-radius:12px; padding:12px; background:var(--panel-2)}
+.ps-sect + .ps-sect{margin-top:10px}
+.ps-h{font-size:11px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; color:var(--muted); margin-bottom:8px}
+.ps-row{display:grid; grid-template-columns:1fr 130px; align-items:center; gap:10px; margin-bottom:7px}
+.ps-row:last-child{margin-bottom:0}
+.ps-row span{font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.ps-row input{padding:7px 9px}
+.ps-summary{margin-top:12px; border-top:1px dashed var(--line); padding-top:10px; display:grid; gap:4px}
+.ps-summary div{display:flex; justify-content:space-between; font-size:13px}
+.ps-summary b.pos{color:var(--income)} .ps-summary b.neg{color:var(--expense)}
+.ps-summary .net{border-top:1px solid var(--line); margin-top:4px; padding-top:6px; font-weight:800; font-size:15px}
+.ps-summary .net b{color:var(--navy)} [data-theme="dark"] .ps-summary .net b{color:var(--accent)}
 .seg button{flex:1; background:var(--panel-2); border:none; padding:10px; font-weight:700; font-size:13px; color:var(--muted); border-right:1px solid var(--line)}
 .seg button:last-child{border-right:none}
 .seg button.on[data-t="Income"]{background:var(--income); color:#fff}
@@ -583,12 +597,16 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
           <button data-t="Deduction" onclick="pickType('Deduction')">Deduction</button>
         </div>
       </div>
-      <div class="frow two">
-        <div class="frow"><label>Date</label><input type="date" class="field" id="tDate"></div>
+      <div class="frow"><label>Date</label><input type="date" class="field" id="tDate"></div>
+
+      <div id="singleFields">
         <div class="frow"><label>Amount (R)</label><input type="number" step="0.01" min="0" class="field num" id="tAmount" placeholder="0.00"></div>
+        <div class="frow"><label>Description</label><input class="field" id="tDesc" placeholder="Who / what was it for?"></div>
+        <div class="frow"><label>Allocation</label><select class="field" id="tAlloc"></select></div>
       </div>
-      <div class="frow"><label>Description</label><input class="field" id="tDesc" placeholder="Who / what was it for?"></div>
-      <div class="frow"><label>Allocation</label><select class="field" id="tAlloc"></select></div>
+
+      <div id="payslipBox" style="display:none"></div>
+
       <div class="frow two">
         <div class="frow"><label>Paid from</label><select class="field" id="tAccount"></select></div>
         <div class="frow"><label>Person</label><select class="field" id="tPerson"></select></div>
@@ -985,32 +1003,79 @@ function deleteAllTxns(){
 }
 
 /* transaction modal */
+let _openAlloc=null;
 function openTxn(id){
   editingId = id||null;
   const t = id ? state.transactions.find(x=>x.id===id) : null;
-  document.getElementById('txnTitle').textContent = t? 'Edit transaction' : 'New transaction';
   pendingType = t? t.type : 'Expense';
+  _openAlloc = t? t.allocation : null;
   paintTypeSeg();
   document.getElementById('tDate').value = t? t.date : new Date().toISOString().slice(0,10);
   document.getElementById('tAmount').value = t? Math.abs(t.amount) : '';
   document.getElementById('tDesc').value = t? (t.description||'') : '';
   document.getElementById('tNotes').value = t? (t.notes||'') : '';
   refreshDropdowns();
-  fillAlloc(t? t.allocation : null);
+  updateTxnMode();
   document.getElementById('tAccount').value = t? t.account : state.lists.accounts[0];
   document.getElementById('tPerson').value = t? t.person : state.lists.persons[0];
   document.getElementById('txnModal').classList.add('show');
 }
 function closeTxn(){ document.getElementById('txnModal').classList.remove('show'); }
-function pickType(t){ pendingType=t; paintTypeSeg(); fillAlloc(); }
+function pickType(t){ pendingType=t; paintTypeSeg(); updateTxnMode(); }
 function paintTypeSeg(){ document.querySelectorAll('#typeSeg button').forEach(b=>b.classList.toggle('on', b.dataset.t===pendingType)); }
+/* NEW income = payslip layout (income + deductions from Setup). Everything else = single entry. */
+function payslipMode(){ return pendingType==='Income' && !editingId; }
+function updateTxnMode(){
+  const ps=payslipMode();
+  document.getElementById('singleFields').style.display = ps?'none':'';
+  document.getElementById('payslipBox').style.display   = ps?'':'none';
+  document.getElementById('txnTitle').textContent = editingId?'Edit transaction':(ps?'New income / payslip':'New transaction');
+  if(ps) buildPayslip(); else fillAlloc(_openAlloc);
+}
 function fillAlloc(sel){
   const el=document.getElementById('tAlloc');
   const items=state.lists.allocations[pendingType]||[];
   el.innerHTML=items.map(i=>`<option>${esc(i)}</option>`).join('');
   if(sel && items.includes(sel)) el.value=sel;
 }
+function buildPayslip(){
+  const box=document.getElementById('payslipBox');
+  const inc=state.lists.allocations.Income||[];
+  const ded=state.lists.allocations.Deduction||[];
+  const row=(sect,name)=>`<div class="ps-row"><span title="${esc(name)}">${esc(name)}</span><input type="number" step="0.01" min="0" class="field num ps-amt" data-sect="${sect}" data-alloc="${esc(name)}" placeholder="0.00" oninput="payslipTotals()"></div>`;
+  box.innerHTML =
+    `<div class="frow"><label>Description <span class="tiny">(optional)</span></label><input class="field" id="psDesc" placeholder="e.g. March payslip"></div>`+
+    `<div class="ps-sect"><div class="ps-h">Income</div>${inc.length?inc.map(a=>row('Income',a)).join(''):'<div class="tiny">No income allocations yet — add some in Setup.</div>'}</div>`+
+    `<div class="ps-sect"><div class="ps-h">Deductions <span class="tiny">taken off</span></div>${ded.length?ded.map(a=>row('Deduction',a)).join(''):'<div class="tiny">No deduction allocations yet — add some in Setup.</div>'}</div>`+
+    `<div class="ps-summary" id="psSummary"></div>`;
+  payslipTotals();
+}
+function payslipTotals(){
+  let g=0,d=0;
+  document.querySelectorAll('#payslipBox .ps-amt').forEach(i=>{ const v=Number(i.value)||0; if(i.dataset.sect==='Income') g+=v; else d+=v; });
+  const el=document.getElementById('psSummary'); if(!el) return;
+  el.innerHTML=`<div><span>Gross income</span><b class="pos">${fmt(g)}</b></div>`+
+    `<div><span>Deductions</span><b class="neg">${fmt(d)}</b></div>`+
+    `<div class="net"><span>Net (take-home)</span><b>${fmt(g-d)}</b></div>`;
+}
+function savePayslip(){
+  const date=document.getElementById('tDate').value;
+  if(!date){ toast('Please pick a date',true); return; }
+  const account=document.getElementById('tAccount').value, person=document.getElementById('tPerson').value;
+  const notes=document.getElementById('tNotes').value.trim();
+  const desc=(document.getElementById('psDesc').value||'').trim();
+  const rows=[...document.querySelectorAll('#payslipBox .ps-amt')]
+    .map(i=>({sect:i.dataset.sect,alloc:i.dataset.alloc,amt:Number(i.value)||0}))
+    .filter(r=>r.amt>0);
+  if(!rows.length){ toast('Enter at least one amount',true); return; }
+  rows.forEach(r=>state.transactions.push({ id:uid(), date, description:desc||r.alloc,
+    type:r.sect, allocation:r.alloc, amount:Math.abs(r.amt), account, person, notes }));
+  save(); closeTxn(); render();
+  const ni=rows.filter(r=>r.sect==='Income').length, nd=rows.filter(r=>r.sect==='Deduction').length;
+  toast(`Saved ${ni} income + ${nd} deduction line(s)`);
+}
 function saveTxn(){
+  if(payslipMode()) return savePayslip();
   const amt=Number(document.getElementById('tAmount').value)||0;
   const date=document.getElementById('tDate').value;
   if(!date){ toast('Please pick a date',true); return; }
