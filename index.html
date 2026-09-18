@@ -426,6 +426,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
             </div>
           </div>
           <button class="btn ghost" onclick="exportCsv()">📤 Export CSV</button>
+          <button class="btn ghost" onclick="openArchive()">🗄 Archive</button>
           <button class="btn primary" onclick="openTxn()">＋ New transaction</button>
         </div>
       </div>
@@ -438,6 +439,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
         <div class="fx"><label>Person</label><select class="field" id="txPerson" onchange="renderTxns()"></select></div>
         <div class="fx"><label>Month</label><select class="field" id="txMonth" onchange="renderTxns()"></select></div>
         <div class="flush">
+          <button class="btn ghost sm" id="editSelBtn" onclick="openBulk()" disabled>✏ Edit ticked</button>
           <button class="btn danger sm" id="delSelBtn" onclick="deleteSelected()" disabled>🗑 Delete ticked</button>
           <button class="btn ghost sm" onclick="deleteAllTxns()">Delete all</button>
         </div>
@@ -568,6 +570,18 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
         </div>
       </div>
       <div class="card pad" style="margin-top:16px">
+        <h3 style="margin-bottom:4px">Currency</h3>
+        <p class="tiny" style="margin-bottom:12px">The symbol shown throughout the app. Pick one, or choose <b>Custom…</b> to enter your own.</p>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center">
+          <select class="field" id="curSelect" style="max-width:230px" onchange="onCurSelect()"></select>
+          <span id="curCustom" style="display:none; gap:8px; align-items:center">
+            <input class="field" id="curCode" placeholder="Code (e.g. BTC)" style="max-width:130px">
+            <input class="field" id="curSymbol" placeholder="Symbol" style="max-width:100px">
+            <button class="btn primary sm" onclick="saveCustomCur()">Set</button>
+          </span>
+        </div>
+      </div>
+      <div class="card pad" style="margin-top:16px">
         <h3 style="margin-bottom:4px">Saved statement layouts</h3>
         <p class="tiny" style="margin-bottom:12px">When you import a bank statement with a new column layout, MyFinances asks you to match the columns and can save that layout here so the same bank imports automatically next time.</p>
         <div id="mappingsBox" style="display:grid; gap:8px"></div>
@@ -600,7 +614,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
       <div class="frow"><label>Date</label><input type="date" class="field" id="tDate"></div>
 
       <div id="singleFields">
-        <div class="frow"><label>Amount (R)</label><input type="number" step="0.01" min="0" class="field num" id="tAmount" placeholder="0.00"></div>
+        <div class="frow"><label>Amount (<span id="amtCur">R</span>)</label><input type="number" step="0.01" min="0" class="field num" id="tAmount" placeholder="0.00"></div>
         <div class="frow"><label>Description</label><input class="field" id="tDesc" placeholder="Who / what was it for?"></div>
         <div class="frow"><label>Allocation</label><select class="field" id="tAlloc"></select></div>
       </div>
@@ -643,6 +657,54 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
       <button class="btn ghost" id="settingsCancel" onclick="closeSettings()">Cancel</button>
       <button class="btn primary" id="saveConnBtn" onclick="saveSettings()">Save connection</button>
     </div>
+  </div>
+</div>
+
+<!-- Reason-for-archiving dialog -->
+<div class="modal-bg" id="reasonModal">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-h"><h3>Archive transaction(s)</h3><button class="x" onclick="closeReason()">×</button></div>
+    <div class="modal-b">
+      <p class="tiny" id="reasonCount"></p>
+      <div class="frow"><label>Reason for removing <span class="tiny">(kept with the archived record)</span></label>
+        <input class="field" id="reasonInput" placeholder="e.g. duplicate, wrong amount…" onkeydown="if(event.key==='Enter')confirmArchive()"></div>
+    </div>
+    <div class="modal-f"><button class="btn ghost" onclick="closeReason()">Cancel</button><button class="btn danger" onclick="confirmArchive()">Archive</button></div>
+  </div>
+</div>
+
+<!-- Archive viewer -->
+<div class="modal-bg" id="archiveModal">
+  <div class="modal" style="max-width:840px">
+    <div class="modal-h"><h3>Archived transactions <span class="tiny" id="archiveCount"></span></h3><button class="x" onclick="closeArchive()">×</button></div>
+    <div class="modal-b">
+      <p class="tiny">Deleted transactions are kept here with the reason. <b>Restore</b> puts one back; <b>Delete</b> removes it for good.</p>
+      <div class="table-wrap table-scroll">
+        <table>
+          <thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Allocation</th><th class="r">Amount</th><th>Reason</th><th></th></tr></thead>
+          <tbody id="archiveBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-f"><button class="btn ghost" onclick="closeArchive()">Close</button></div>
+  </div>
+</div>
+
+<!-- Bulk edit ticked -->
+<div class="modal-bg" id="bulkModal">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-h"><h3>Edit ticked transactions</h3><button class="x" onclick="closeBulk()">×</button></div>
+    <div class="modal-b">
+      <p class="tiny" id="bulkCount"></p>
+      <p class="tiny">Only the fields you set will change — leave a field on "— keep —" to leave it as is.</p>
+      <div class="frow"><label>Type</label><select class="field" id="bulkType"><option value="">— keep —</option><option>Income</option><option>Expense</option><option>Deduction</option></select></div>
+      <div class="frow"><label>Allocation</label><select class="field" id="bulkAlloc"></select></div>
+      <div class="frow two">
+        <div class="frow"><label>Account</label><select class="field" id="bulkAccount"></select></div>
+        <div class="frow"><label>Person</label><select class="field" id="bulkPerson"></select></div>
+      </div>
+    </div>
+    <div class="modal-f"><button class="btn ghost" onclick="closeBulk()">Cancel</button><button class="btn primary" onclick="applyBulk()">Apply to ticked</button></div>
   </div>
 </div>
 
@@ -710,6 +772,13 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 const FY = ['Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb']; // SA financial year
 const TYPES = ['Income','Expense','Deduction'];
 const CUR = 'R';
+const CURRENCIES=[
+  {code:'ZAR',symbol:'R'},{code:'USD',symbol:'$'},{code:'EUR',symbol:'€'},{code:'GBP',symbol:'£'},
+  {code:'AUD',symbol:'A$'},{code:'CAD',symbol:'C$'},{code:'NZD',symbol:'NZ$'},{code:'INR',symbol:'₹'},
+  {code:'JPY',symbol:'¥'},{code:'CNY',symbol:'¥'},{code:'NGN',symbol:'₦'},{code:'KES',symbol:'KSh'},
+  {code:'AED',symbol:'AED'},{code:'CHF',symbol:'CHF'},{code:'BRL',symbol:'R$'}
+];
+function curSym(){ return (state&&state.settings&&state.settings.currency&&state.settings.currency.symbol)||CUR; }
 
 const DEFAULT_LISTS = {
   allocations: {
@@ -739,7 +808,8 @@ let pendingType = 'Expense';
 const LS = 'pfm_state_v1';
 function blankState(){
   return { transactions:[], lists:JSON.parse(JSON.stringify(DEFAULT_LISTS)), budgets:{},
-           settings:{ supaUrl:'', supaKey:'', userName:(DEFAULT_LISTS.persons[0]||'') } };
+           settings:{ supaUrl:'', supaKey:'', userName:(DEFAULT_LISTS.persons[0]||''), currency:{code:'ZAR',symbol:'R'} },
+           archived:[] };
 }
 function save(){ localStorage.setItem(LS, JSON.stringify(state)); if(cloudOn()) cloudPush(); }
 function load(){
@@ -751,7 +821,9 @@ function load(){
 // Fill in any missing/older fields — used on local load AND after a cloud pull
 function normalizeState(){
   if(!state.transactions) state.transactions = [];
+  if(!Array.isArray(state.archived)) state.archived = [];
   if(!state.settings) state.settings = {supaUrl:'',supaKey:'',userName:''};
+  if(!state.settings.currency || !state.settings.currency.symbol) state.settings.currency = {code:'ZAR',symbol:'R'};
   if(state.settings.userName===undefined) state.settings.userName = (state.lists&&state.lists.persons&&state.lists.persons[0])||'';
   if(!state.budgets) state.budgets = {};
   if(!state.lists) state.lists = JSON.parse(JSON.stringify(DEFAULT_LISTS));
@@ -805,12 +877,12 @@ function group(intStr){ return intStr.replace(/\B(?=(\d{3})+(?!\d))/g,' '); } //
 function fmt(n){
   const neg=n<0, a=Math.abs(Number(n)||0);
   const parts=a.toFixed(2).split('.');
-  const s=CUR+' '+group(parts[0])+'.'+parts[1];
+  const s=curSym()+' '+group(parts[0])+'.'+parts[1];
   return neg ? '('+s+')' : s;
 }
 function fmt0(n){
   const a=Math.round(Math.abs(Number(n)||0));
-  return CUR+' '+group(String(a));
+  return curSym()+' '+group(String(a));
 }
 function toast(msg,err){ const t=document.getElementById('toast'); t.textContent=msg; t.className='show'+(err?' err':''); setTimeout(()=>t.className='',2200); }
 
@@ -983,23 +1055,84 @@ function renderTxns(){
 }
 function tickChanged(){
   const n=document.querySelectorAll('.tick:checked').length;
-  document.getElementById('delSelBtn').disabled = n===0;
-  document.getElementById('delSelBtn').textContent = n? `🗑 Delete ticked (${n})` : '🗑 Delete ticked';
+  const del=document.getElementById('delSelBtn'), ed=document.getElementById('editSelBtn');
+  if(del){ del.disabled=n===0; del.textContent = n? `🗑 Delete ticked (${n})`:'🗑 Delete ticked'; }
+  if(ed){ ed.disabled=n===0; ed.textContent = n? `✏ Edit ticked (${n})`:'✏ Edit ticked'; }
 }
 function tickAll(on){ document.querySelectorAll('.tick').forEach(c=>c.checked=on); tickChanged(); }
-function deleteSelected(){
-  const ids=[...document.querySelectorAll('.tick:checked')].map(c=>c.dataset.id);
-  if(!ids.length) return;
-  if(!confirm(`Delete ${ids.length} ticked transaction(s)? This can't be undone.`)) return;
-  ids.forEach(id=>cloudDelete(id));
-  state.transactions=state.transactions.filter(t=>!ids.includes(t.id));
-  save(); render(); toast(`${ids.length} transaction(s) deleted`);
+function tickedIds(){ return [...document.querySelectorAll('.tick:checked')].map(c=>c.dataset.id); }
+
+/* ---- delete = ask a reason, then archive (kept & viewable) ---- */
+let _pendingArchive=[];
+function deleteSelected(){ const ids=tickedIds(); if(!ids.length) return; askArchive(ids,false); }
+function deleteAllTxns(){ if(!state.transactions.length) return; askArchive(state.transactions.map(t=>t.id),true); }
+function askArchive(ids,all){
+  _pendingArchive=ids;
+  document.getElementById('reasonCount').textContent = all
+    ? `Archiving all ${ids.length} transaction(s).`
+    : `Archiving ${ids.length} ticked transaction(s).`;
+  document.getElementById('reasonInput').value='';
+  document.getElementById('reasonModal').classList.add('show');
+  setTimeout(()=>document.getElementById('reasonInput').focus(),50);
 }
-function deleteAllTxns(){
-  if(!state.transactions.length) return;
-  if(!confirm('Delete ALL transactions? This cannot be undone.')) return;
-  state.transactions.forEach(t=>cloudDelete(t.id));
-  state.transactions=[]; save(); render(); toast('All transactions deleted');
+function closeReason(){ document.getElementById('reasonModal').classList.remove('show'); _pendingArchive=[]; }
+function confirmArchive(){
+  const reason=(document.getElementById('reasonInput').value||'').trim();
+  const ids=_pendingArchive; if(!ids.length){ closeReason(); return; }
+  const when=new Date().toISOString(), keep=[], moved=[];
+  state.transactions.forEach(t=>{ if(ids.includes(t.id)) moved.push({...t,_archivedAt:when,_reason:reason}); else keep.push(t); });
+  state.transactions=keep; state.archived=(state.archived||[]).concat(moved);
+  save(); closeReason(); render(); toast(`${moved.length} transaction(s) archived`);
+}
+
+/* ---- archive viewer ---- */
+function openArchive(){ renderArchive(); document.getElementById('archiveModal').classList.add('show'); }
+function closeArchive(){ document.getElementById('archiveModal').classList.remove('show'); }
+function renderArchive(){
+  const box=document.getElementById('archiveBody');
+  const a=(state.archived||[]).slice().sort((x,y)=>((x._archivedAt||'')<(y._archivedAt||'')?1:-1));
+  document.getElementById('archiveCount').textContent = `${a.length} archived`;
+  if(!a.length){ box.innerHTML=`<tr><td colspan="7"><div class="empty"><div class="big">🗄</div><h3>Nothing archived</h3><div>Deleted transactions are kept here with their reason.</div></div></td></tr>`; return; }
+  box.innerHTML=a.map(t=>`<tr>
+    <td class="num">${t.date}</td>
+    <td>${esc(t.description||'')}</td>
+    <td><span class="pill ${t.type.toLowerCase()}">${t.type}</span></td>
+    <td>${esc(t.allocation||'')}</td>
+    <td class="r num ${signed(t)<0?'neg':'pos'}">${fmt(signed(t))}</td>
+    <td>${esc(t._reason||'')}<div class="tiny">${(t._archivedAt||'').slice(0,10)}</div></td>
+    <td style="white-space:nowrap"><button class="btn ghost sm" onclick="restoreArchived('${t.id}')">Restore</button> <button class="btn danger sm" onclick="purgeArchived('${t.id}')">Delete</button></td>
+  </tr>`).join('');
+}
+function restoreArchived(id){
+  const i=(state.archived||[]).findIndex(t=>t.id===id); if(i<0) return;
+  const t={...state.archived[i]}; delete t._archivedAt; delete t._reason;
+  state.archived.splice(i,1); state.transactions.push(t);
+  save(); renderArchive(); render(); toast('Restored');
+}
+function purgeArchived(id){
+  if(!confirm('Permanently delete this archived transaction? This cannot be undone.')) return;
+  state.archived=(state.archived||[]).filter(t=>t.id!==id); save(); renderArchive(); toast('Permanently deleted');
+}
+
+/* ---- bulk edit ticked ---- */
+function openBulk(){
+  const ids=tickedIds(); if(!ids.length) return;
+  document.getElementById('bulkCount').textContent=`${ids.length} transaction(s) selected.`;
+  document.getElementById('bulkType').value='';
+  fillBulkSelect('bulkAlloc', allAllocations());
+  fillBulkSelect('bulkAccount', state.lists.accounts);
+  fillBulkSelect('bulkPerson', state.lists.persons);
+  document.getElementById('bulkModal').classList.add('show');
+}
+function fillBulkSelect(id,items){ document.getElementById(id).innerHTML='<option value="">— keep —</option>'+items.map(i=>`<option>${esc(i)}</option>`).join(''); }
+function closeBulk(){ document.getElementById('bulkModal').classList.remove('show'); }
+function applyBulk(){
+  const ids=tickedIds(); if(!ids.length){ closeBulk(); return; }
+  const ty=val('bulkType'), al=val('bulkAlloc'), ac=val('bulkAccount'), pe=val('bulkPerson');
+  if(!ty&&!al&&!ac&&!pe){ toast('Choose at least one field to change',true); return; }
+  let n=0;
+  state.transactions.forEach(t=>{ if(ids.includes(t.id)){ if(ty)t.type=ty; if(al)t.allocation=al; if(ac)t.account=ac; if(pe)t.person=pe; n++; } });
+  save(); closeBulk(); render(); toast(`Updated ${n} transaction(s)`);
 }
 
 /* transaction modal */
@@ -1027,6 +1160,7 @@ function paintTypeSeg(){ document.querySelectorAll('#typeSeg button').forEach(b=
 function payslipMode(){ return pendingType==='Income' && !editingId; }
 function updateTxnMode(){
   const ps=payslipMode();
+  const ac=document.getElementById('amtCur'); if(ac) ac.textContent=curSym();
   document.getElementById('singleFields').style.display = ps?'none':'';
   document.getElementById('payslipBox').style.display   = ps?'':'none';
   document.getElementById('txnTitle').textContent = editingId?'Edit transaction':(ps?'New income / payslip':'New transaction');
@@ -1529,6 +1663,7 @@ function renderSetup(){
   chipBox('listAccounts', state.lists.accounts, i=>removeSimple('accounts',i));
   chipBox('listPersons', state.lists.persons, i=>removeSimple('persons',i));
   renderClaimable();
+  renderCurrency();
   const mb=document.getElementById('mappingsBox');
   if(mb){
     const ms=state.lists.importMappings||[];
@@ -1538,6 +1673,28 @@ function renderSetup(){
   const un=document.getElementById('userNameInput'); if(un) un.value=(state.settings&&state.settings.userName)||'';
 }
 function setUserName(v){ if(!state.settings) state.settings={}; state.settings.userName=v; save(); renderGreeting(); }
+function renderCurrency(){
+  const sel=document.getElementById('curSelect'); if(!sel) return;
+  const cur=state.settings.currency||{code:'ZAR',symbol:'R'};
+  const inList=CURRENCIES.find(c=>c.code===cur.code && c.symbol===cur.symbol);
+  sel.innerHTML=CURRENCIES.map(c=>`<option value="${c.code}">${c.code} (${esc(c.symbol)})</option>`).join('')+`<option value="__custom">Custom…</option>`;
+  sel.value = inList? cur.code : '__custom';
+  const custom=document.getElementById('curCustom'); if(custom) custom.style.display = inList?'none':'inline-flex';
+  const cc=document.getElementById('curCode'), cs=document.getElementById('curSymbol');
+  if(cc) cc.value=cur.code||''; if(cs) cs.value=cur.symbol||'';
+}
+function onCurSelect(){
+  const v=document.getElementById('curSelect').value;
+  if(v==='__custom'){ document.getElementById('curCustom').style.display='inline-flex'; document.getElementById('curSymbol').focus(); return; }
+  const c=CURRENCIES.find(x=>x.code===v);
+  if(c){ state.settings.currency={code:c.code,symbol:c.symbol}; save(); render(); toast('Currency updated'); }
+}
+function saveCustomCur(){
+  const code=(document.getElementById('curCode').value||'').trim()||'CUR';
+  const symbol=(document.getElementById('curSymbol').value||'').trim();
+  if(!symbol){ toast('Enter a currency symbol',true); return; }
+  state.settings.currency={code,symbol}; save(); render(); toast('Currency updated');
+}
 function chipBox(id, items, onRemove){
   const el=document.getElementById(id);
   el.innerHTML=items.map((it,i)=>`<span class="chip">${esc(it)}<button title="Remove" onclick="(${'window.__rm'})('${id}',${i})">×</button></span>`).join('') || '<span class="tiny">None yet.</span>';
