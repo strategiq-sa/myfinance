@@ -370,7 +370,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
     <nav class="tabs" id="nav">
       <button data-view="dashboard" class="active"><span class="ic">📊</span>Dashboard</button>
       <button data-view="transactions"><span class="ic">💳</span>Transactions</button>
-      <button data-view="staging"><span class="ic">📥</span>Import review<span class="nav-badge" id="stBadge"></span></button>
+      <button data-view="staging"><span class="ic">📥</span>Import Statement<span class="nav-badge" id="stBadge"></span></button>
       <button data-view="budget"><span class="ic">🎯</span>Budget</button>
       <button data-view="reports"><span class="ic">📑</span>Reports</button>
       <button data-view="tax"><span class="ic">🧾</span>Tax</button>
@@ -444,14 +444,6 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
           <p class="desc">Capture every income, expense &amp; deduction. Expenses are stored as money out automatically.</p>
         </div>
         <div class="no-print" style="display:flex; gap:8px; flex-wrap:wrap">
-          <div class="dropdown" id="importDrop">
-            <button class="btn ghost" onclick="toggleImportMenu(event)">📥 Import ▾</button>
-            <div class="dropdown-menu" id="importMenu">
-              <button type="button" onclick="pickImport('csv')">CSV file <span class="tiny">.csv</span></button>
-              <button type="button" onclick="pickImport('xlsx')">Excel file <span class="tiny">.xlsx</span></button>
-              <button type="button" onclick="pickImport('pdf')">PDF statement <span class="tiny">.pdf</span></button>
-            </div>
-          </div>
           <button class="btn ghost" onclick="exportCsv()">📤 Export CSV</button>
           <button class="btn ghost" onclick="openArchive()">🗄 Archive</button>
           <button class="btn primary" onclick="openTxn()">＋ New transaction</button>
@@ -494,7 +486,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
       <div class="page-head">
         <div>
           <div class="eyebrow">Before it hits the ledger</div>
-          <h2>Import review</h2>
+          <h2>Import Statement</h2>
           <p class="desc">Imported statement lines wait here. Allocate and fix them, tick <b>Yes</b> on the ones that are ready, then move them to Transactions.</p>
         </div>
         <div class="no-print" style="display:flex; gap:8px; flex-wrap:wrap">
@@ -514,16 +506,20 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
 
       <div class="filters no-print">
         <div class="fx"><label>Search</label><input class="field" id="stSearch" placeholder="Description, notes…" oninput="renderStaging()" style="min-width:200px"></div>
+        <div class="fx"><label>Type</label><select class="field" id="stType" onchange="renderStaging()"><option>All</option><option>Income</option><option>Expense</option><option>Deduction</option></select></div>
+        <div class="fx"><label>Allocation</label><select class="field" id="stAlloc" onchange="renderStaging()"><option>All</option></select></div>
         <div class="fx"><label>Show</label><select class="field" id="stFilter" onchange="renderStaging()">
           <option value="all">All items</option><option value="todo">Needs allocation</option>
           <option value="notready">Not ticked yet</option><option value="ready">Ticked Yes</option><option value="dup">Possible duplicates</option>
         </select></div>
+        <div class="flush"><button class="btn ghost sm" onclick="stResetFilters()">Clear filters</button></div>
       </div>
 
       <div class="card">
         <div class="st-bar no-print">
           <span class="tiny" id="stSelInfo">Select rows with the left box to edit several at once.</span>
           <span class="grow"></span>
+          <button class="btn primary sm" onclick="stTickAll()" title="Tick Yes on every item shown (respects the filters above)">✔ Tick all as ready</button>
           <button class="btn ghost sm stSelBtn" onclick="stMarkSelected(true)" disabled>✔ Tick selected Yes</button>
           <button class="btn ghost sm stSelBtn" onclick="stMarkSelected(false)" disabled>Untick selected</button>
           <button class="btn ghost sm stSelBtn" onclick="openBulk('staging')" disabled>✏ Edit selected</button>
@@ -803,7 +799,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
     </div>
     <div class="modal-f">
       <button class="btn ghost" onclick="closeMap()">Cancel</button>
-      <button class="btn primary" onclick="confirmMapping()">Send to Import review</button>
+      <button class="btn primary" onclick="confirmMapping()">Send to Import Statement</button>
     </div>
   </div>
 </div>
@@ -1200,7 +1196,7 @@ function purgeArchived(id){
 }
 
 /* ---- bulk edit ticked ---- */
-let _bulkTarget='txns';   // 'txns' = Transactions page, 'staging' = Import review
+let _bulkTarget='txns';   // 'txns' = Transactions page, 'staging' = Import Statement
 function bulkIds(){ return _bulkTarget==='staging' ? stSelIds() : tickedIds(); }
 function openBulk(target){
   _bulkTarget = target==='staging' ? 'staging' : 'txns';
@@ -1326,7 +1322,7 @@ function exportCsv(){
 }
 function dl(name,text){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([text],{type:'text/csv'})); a.download=name; a.click(); }
 /* ---------- Import: CSV / Excel / PDF ---------- */
-function toggleImportMenu(e,id){ if(e) e.stopPropagation(); const m=document.getElementById(id||'importMenu'); if(!m) return; const on=!m.classList.contains('show'); closeImportMenu(); if(on) m.classList.add('show'); }
+function toggleImportMenu(e,id){ if(e) e.stopPropagation(); const m=document.getElementById(id||'importMenu2'); if(!m) return; const on=!m.classList.contains('show'); closeImportMenu(); if(on) m.classList.add('show'); }
 function closeImportMenu(){ document.querySelectorAll('.dropdown-menu.show').forEach(m=>m.classList.remove('show')); }
 document.addEventListener('click',()=>closeImportMenu());
 function pickImport(kind){
@@ -1571,7 +1567,7 @@ function addImported(txns){
     n++;
   });
   save(); goView('staging');
-  toast(`${n} item(s) added to Import review`+(sug?` · ${sug} auto-allocated from history`:'')+_layoutNote);
+  toast(`${n} item(s) added to Import Statement`+(sug?` · ${sug} auto-allocated from history`:'')+_layoutNote);
 }
 
 /* what's still missing before an item may be ticked Yes */
@@ -1596,7 +1592,7 @@ function renderStageBanner(){
   const el=document.getElementById('stageBanner'); if(!el) return;
   const n=(state.staging||[]).length;
   el.style.display=n?'':'none';
-  if(n) el.innerHTML=`<span>📥 <b>${n}</b> imported item${n!==1?'s are':' is'} waiting in <b>Import review</b> — allocate and tick them there to add them here.</span><button class="btn primary sm" onclick="goView('staging')">Review now</button>`;
+  if(n) el.innerHTML=`<span>📥 <b>${n}</b> imported item${n!==1?'s are':' is'} waiting in <b>Import Statement</b> — allocate and tick them there to add them here.</span><button class="btn primary sm" onclick="goView('staging')">Review now</button>`;
 }
 
 function stOpts(items,cur,placeholder){
@@ -1610,7 +1606,17 @@ function renderStaging(){
   const all=state.staging||[];
   const dups=stDupInfo();
   const q=(val('stSearch')||'').toLowerCase(), f=val('stFilter')||'all';
+  const fty=val('stType')||'All';
+  // allocation filter: every known allocation (for the chosen type) plus any new ones in the review
+  const aEl=document.getElementById('stAlloc'), aCur=aEl?aEl.value:'All';
+  const aList=[...new Set([...(fty==='All'?allAllocations():(state.lists.allocations[fty]||[])),
+    ...all.filter(s=>fty==='All'||s.type===fty).map(s=>String(s.allocation||'').trim()).filter(Boolean)])];
+  if(aEl){ aEl.innerHTML='<option>All</option><option value="__none">— Unallocated —</option>'+aList.map(a=>`<option>${esc(a)}</option>`).join('');
+    aEl.value=[...aEl.options].some(o=>o.value===aCur)?aCur:'All'; }
+  const fal=aEl?aEl.value:'All';
   const rows=all.filter(s=>
+    (fty==='All'||s.type===fty) &&
+    (fal==='All'||(fal==='__none'?!String(s.allocation||'').trim():s.allocation===fal)) &&
     (f==='all' || (f==='todo'&&!String(s.allocation||'').trim()) || (f==='ready'&&s.ready) || (f==='notready'&&!s.ready) || (f==='dup'&&dups[s.id])) &&
     (!q || (s.description||'').toLowerCase().includes(q) || (s.notes||'').toLowerCase().includes(q) || (s.allocation||'').toLowerCase().includes(q)))
     .sort((a,b)=>(a.date<b.date?-1:a.date>b.date?1:0));
@@ -1653,7 +1659,20 @@ function renderStaging(){
   const pb=document.getElementById('stPostBtn');
   if(pb){ pb.disabled=!ready.length; pb.textContent = ready.length?`➜ Move ${ready.length} ticked to Transactions`:'➜ Move ticked to Transactions'; }
   document.getElementById('stSelAll').checked=false;
+  _stShown=rows.map(s=>s.id);
   stSelChanged(); updateStageBadge();
+}
+let _stShown=[];
+function stResetFilters(){ ['stSearch'].forEach(id=>{const e=document.getElementById(id); if(e) e.value='';});
+  ['stType','stAlloc'].forEach(id=>{const e=document.getElementById(id); if(e) e.value='All';});
+  const f=document.getElementById('stFilter'); if(f) f.value='all'; renderStaging(); }
+function stTickAll(){
+  const ids=_stShown.filter(id=>{const s=stFind(id); return s&&!s.ready;});
+  if(!ids.length){ toast(_stShown.length?'Everything shown is already ticked':'Nothing to tick',!_stShown.length); return; }
+  let n=0, blocked=0;
+  ids.forEach(id=>{ const s=stFind(id); if(stProblem(s)){ blocked++; return; } s.ready=true; s.suggested=false; n++; });
+  save(); renderStaging();
+  toast(`Ticked ${n} as ready`+(blocked?` · ${blocked} still need an allocation, date or amount`:''), blocked>0&&!n);
 }
 
 /* inline edits */
@@ -1711,15 +1730,15 @@ function stApplyBulk(ids,ty,al,ac,pe){
 }
 function stRemove(ids){
   if(!ids.length) return;
-  if(ids.length>1 && !confirm(`Remove ${ids.length} item(s) from Import review? They will not be imported.`)) return;
+  if(ids.length>1 && !confirm(`Remove ${ids.length} item(s) from Import Statement? They will not be imported.`)) return;
   state.staging=state.staging.filter(s=>!ids.includes(s.id));
   save(); render(); toast(`Removed ${ids.length} item(s)`);
 }
 function stRemoveSelected(){ stRemove(stSelIds()); }
 function stClearAll(){
   if(!state.staging.length) return;
-  if(!confirm(`Clear all ${state.staging.length} item(s) from Import review? Nothing will be imported.`)) return;
-  state.staging=[]; save(); render(); toast('Import review cleared');
+  if(!confirm(`Clear all ${state.staging.length} item(s) from Import Statement? Nothing will be imported.`)) return;
+  state.staging=[]; save(); render(); toast('Import Statement cleared');
 }
 
 /* move every item ticked Yes into Transactions */
