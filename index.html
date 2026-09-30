@@ -255,6 +255,32 @@ tr.tot td{font-weight:800; background:var(--accent-soft); border-top:2px solid v
 .map-save input[type=text],.map-save .field{max-width:190px; display:inline-block}
 .map-save input[type=checkbox]{width:16px; height:16px; accent-color:var(--brand)}
 
+/* import review (staging) */
+.nav-badge{display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; margin-left:6px; border-radius:999px; background:var(--expense); color:#fff; font-size:11px; font-weight:800}
+.nav-badge:empty{display:none}
+.st-table td{padding:6px 6px; vertical-align:top}
+.st-table th{padding:10px 6px}
+.st-table .field{min-width:0; width:100%; padding:6px 8px; font-size:13px}
+.st-table .st-date{width:138px}
+.st-table .st-desc{min-width:210px}
+.st-table .st-sel{min-width:130px}
+.st-table .st-amt{width:110px; text-align:right}
+.st-table .st-notes{min-width:120px}
+.st-table tr.st-ready td{background:var(--income-soft)}
+.st-table tr.st-ready:hover td{background:var(--income-soft)}
+.st-table .field.st-missing{border-color:var(--expense); box-shadow:0 0 0 2px var(--expense-soft)}
+.st-yes{display:inline-flex; align-items:center; gap:6px; font-weight:700; font-size:12.5px; cursor:pointer; white-space:nowrap; padding-top:6px}
+.st-yes input{width:17px; height:17px; accent-color:var(--income)}
+.st-flags{display:flex; gap:6px; flex-wrap:wrap; margin-top:4px}
+.pill.dup{background:var(--expense-soft); color:var(--expense)}
+.pill.sugg{background:var(--chip); color:var(--brand)}
+.st-dir{font-size:11px; font-weight:700; margin-top:3px; text-align:right}
+.st-bar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; padding:12px 14px; border-bottom:1px solid var(--line)}
+.st-bar .grow{flex:1}
+.st-cards{grid-template-columns:repeat(4,1fr)}
+@media(max-width:900px){.st-cards{grid-template-columns:1fr 1fr}}
+.stage-banner{display:flex; align-items:center; gap:12px; flex-wrap:wrap; justify-content:space-between; margin-bottom:14px}
+
 /* tax-claimable picker */
 .claim-group{margin-bottom:14px}
 .claim-group:last-child{margin-bottom:0}
@@ -344,6 +370,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
     <nav class="tabs" id="nav">
       <button data-view="dashboard" class="active"><span class="ic">📊</span>Dashboard</button>
       <button data-view="transactions"><span class="ic">💳</span>Transactions</button>
+      <button data-view="staging"><span class="ic">📥</span>Import review<span class="nav-badge" id="stBadge"></span></button>
       <button data-view="budget"><span class="ic">🎯</span>Budget</button>
       <button data-view="reports"><span class="ic">📑</span>Reports</button>
       <button data-view="tax"><span class="ic">🧾</span>Tax</button>
@@ -431,6 +458,8 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
         </div>
       </div>
 
+      <div class="callout stage-banner no-print" id="stageBanner" style="display:none"></div>
+
       <div class="filters no-print">
         <div class="fx"><label>Search</label><input class="field" id="txSearch" placeholder="Description, notes…" oninput="renderTxns()" style="min-width:200px"></div>
         <div class="fx"><label>Type</label><select class="field" id="txType" onchange="renderTxns()"><option>All</option><option>Income</option><option>Expense</option><option>Deduction</option></select></div>
@@ -455,6 +484,60 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
               <th class="r">Amount</th><th>Account</th><th>Person</th><th>Month</th><th class="no-print"></th>
             </tr></thead>
             <tbody id="txBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ IMPORT REVIEW (staging) ============ -->
+    <section class="view" id="view-staging">
+      <div class="page-head">
+        <div>
+          <div class="eyebrow">Before it hits the ledger</div>
+          <h2>Import review</h2>
+          <p class="desc">Imported statement lines wait here. Allocate and fix them, tick <b>Yes</b> on the ones that are ready, then move them to Transactions.</p>
+        </div>
+        <div class="no-print" style="display:flex; gap:8px; flex-wrap:wrap">
+          <div class="dropdown">
+            <button class="btn ghost" onclick="toggleImportMenu(event,'importMenu2')">📥 Import statement ▾</button>
+            <div class="dropdown-menu" id="importMenu2">
+              <button type="button" onclick="pickImport('csv')">CSV file <span class="tiny">.csv</span></button>
+              <button type="button" onclick="pickImport('xlsx')">Excel file <span class="tiny">.xlsx</span></button>
+              <button type="button" onclick="pickImport('pdf')">PDF statement <span class="tiny">.pdf</span></button>
+            </div>
+          </div>
+          <button class="btn primary" id="stPostBtn" onclick="postReady()" disabled>➜ Move ticked to Transactions</button>
+        </div>
+      </div>
+
+      <div class="grid st-cards" style="margin-bottom:16px" id="stCards"></div>
+
+      <div class="filters no-print">
+        <div class="fx"><label>Search</label><input class="field" id="stSearch" placeholder="Description, notes…" oninput="renderStaging()" style="min-width:200px"></div>
+        <div class="fx"><label>Show</label><select class="field" id="stFilter" onchange="renderStaging()">
+          <option value="all">All items</option><option value="todo">Needs allocation</option>
+          <option value="notready">Not ticked yet</option><option value="ready">Ticked Yes</option><option value="dup">Possible duplicates</option>
+        </select></div>
+      </div>
+
+      <div class="card">
+        <div class="st-bar no-print">
+          <span class="tiny" id="stSelInfo">Select rows with the left box to edit several at once.</span>
+          <span class="grow"></span>
+          <button class="btn ghost sm stSelBtn" onclick="stMarkSelected(true)" disabled>✔ Tick selected Yes</button>
+          <button class="btn ghost sm stSelBtn" onclick="stMarkSelected(false)" disabled>Untick selected</button>
+          <button class="btn ghost sm stSelBtn" onclick="openBulk('staging')" disabled>✏ Edit selected</button>
+          <button class="btn danger sm stSelBtn" onclick="stRemoveSelected()" disabled>🗑 Remove selected</button>
+          <button class="btn ghost sm" onclick="stClearAll()">Clear all</button>
+        </div>
+        <div class="table-wrap table-scroll" style="max-height:65vh">
+          <table class="st-table">
+            <thead><tr>
+              <th style="width:30px"><input type="checkbox" id="stSelAll" onclick="stSelectAll(this.checked)" title="Select all shown"></th>
+              <th>Ready?</th><th>Date</th><th>Description</th><th>Type</th><th>Allocation</th>
+              <th class="r">Amount</th><th>Account</th><th>Person</th><th>Notes</th><th></th>
+            </tr></thead>
+            <tbody id="stBody"></tbody>
           </table>
         </div>
       </div>
@@ -720,7 +803,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
     </div>
     <div class="modal-f">
       <button class="btn ghost" onclick="closeMap()">Cancel</button>
-      <button class="btn primary" onclick="confirmMapping()">Import</button>
+      <button class="btn primary" onclick="confirmMapping()">Send to Import review</button>
     </div>
   </div>
 </div>
@@ -809,7 +892,7 @@ const LS = 'pfm_state_v1';
 function blankState(){
   return { transactions:[], lists:JSON.parse(JSON.stringify(DEFAULT_LISTS)), budgets:{},
            settings:{ supaUrl:'', supaKey:'', userName:(DEFAULT_LISTS.persons[0]||''), currency:{code:'ZAR',symbol:'R'} },
-           archived:[] };
+           archived:[], staging:[] };
 }
 function save(){ localStorage.setItem(LS, JSON.stringify(state)); if(cloudOn()) cloudPush(); }
 function load(){
@@ -822,6 +905,7 @@ function load(){
 function normalizeState(){
   if(!state.transactions) state.transactions = [];
   if(!Array.isArray(state.archived)) state.archived = [];
+  if(!Array.isArray(state.staging)) state.staging = [];   // imported lines awaiting review
   if(!state.settings) state.settings = {supaUrl:'',supaKey:'',userName:''};
   if(!state.settings.currency || !state.settings.currency.symbol) state.settings.currency = {code:'ZAR',symbol:'R'};
   if(state.settings.userName===undefined) state.settings.userName = (state.lists&&state.lists.persons&&state.lists.persons[0])||'';
@@ -1052,6 +1136,7 @@ function renderTxns(){
   document.getElementById('txTotal').innerHTML = `Net shown: <b class="num" style="color:${tot<0?'var(--expense)':'var(--income)'}">${fmt(tot)}</b>`;
   document.getElementById('tickAll').checked=false;
   tickChanged();
+  renderStageBanner();
 }
 function tickChanged(){
   const n=document.querySelectorAll('.tick:checked').length;
@@ -1115,9 +1200,12 @@ function purgeArchived(id){
 }
 
 /* ---- bulk edit ticked ---- */
-function openBulk(){
-  const ids=tickedIds(); if(!ids.length) return;
-  document.getElementById('bulkCount').textContent=`${ids.length} transaction(s) selected.`;
+let _bulkTarget='txns';   // 'txns' = Transactions page, 'staging' = Import review
+function bulkIds(){ return _bulkTarget==='staging' ? stSelIds() : tickedIds(); }
+function openBulk(target){
+  _bulkTarget = target==='staging' ? 'staging' : 'txns';
+  const ids=bulkIds(); if(!ids.length) return;
+  document.getElementById('bulkCount').textContent=`${ids.length} ${_bulkTarget==='staging'?'imported item':'transaction'}(s) selected.`;
   document.getElementById('bulkType').value='';
   fillBulkSelect('bulkAlloc', allAllocations());
   fillBulkSelect('bulkAccount', state.lists.accounts);
@@ -1127,9 +1215,10 @@ function openBulk(){
 function fillBulkSelect(id,items){ document.getElementById(id).innerHTML='<option value="">— keep —</option>'+items.map(i=>`<option>${esc(i)}</option>`).join(''); }
 function closeBulk(){ document.getElementById('bulkModal').classList.remove('show'); }
 function applyBulk(){
-  const ids=tickedIds(); if(!ids.length){ closeBulk(); return; }
+  const ids=bulkIds(); if(!ids.length){ closeBulk(); return; }
   const ty=val('bulkType'), al=val('bulkAlloc'), ac=val('bulkAccount'), pe=val('bulkPerson');
   if(!ty&&!al&&!ac&&!pe){ toast('Choose at least one field to change',true); return; }
+  if(_bulkTarget==='staging'){ const n=stApplyBulk(ids,ty,al,ac,pe); closeBulk(); save(); render(); toast(`Updated ${n} imported item(s)`); return; }
   let n=0;
   state.transactions.forEach(t=>{ if(ids.includes(t.id)){ if(ty)t.type=ty; if(al)t.allocation=al; if(ac)t.account=ac; if(pe)t.person=pe; n++; } });
   save(); closeBulk(); render(); toast(`Updated ${n} transaction(s)`);
@@ -1237,8 +1326,8 @@ function exportCsv(){
 }
 function dl(name,text){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([text],{type:'text/csv'})); a.download=name; a.click(); }
 /* ---------- Import: CSV / Excel / PDF ---------- */
-function toggleImportMenu(e){ if(e) e.stopPropagation(); const m=document.getElementById('importMenu'); if(m) m.classList.toggle('show'); }
-function closeImportMenu(){ const m=document.getElementById('importMenu'); if(m) m.classList.remove('show'); }
+function toggleImportMenu(e,id){ if(e) e.stopPropagation(); const m=document.getElementById(id||'importMenu'); if(!m) return; const on=!m.classList.contains('show'); closeImportMenu(); if(on) m.classList.add('show'); }
+function closeImportMenu(){ document.querySelectorAll('.dropdown-menu.show').forEach(m=>m.classList.remove('show')); }
 document.addEventListener('click',()=>closeImportMenu());
 function pickImport(kind){
   closeImportMenu();
@@ -1281,7 +1370,7 @@ function beginTabularImport(rows){
   const sig=makeSig(header);
   if(sig===MAP_NATIVE){ addImported(rowsToTxns(rows)); return; }
   const saved=(state.lists.importMappings||[]).find(m=>m.sig===sig);
-  if(saved){ addImported(applyMapping(rows,saved)); toast(`Used your “${saved.name}” layout`); return; }
+  if(saved){ _layoutNote=` · used your “${saved.name}” layout`; addImported(applyMapping(rows,saved)); _layoutNote=''; return; }
   openMapDialog(rows,header,sig);
 }
 function guessCols(header){
@@ -1395,7 +1484,6 @@ async function importPdf(buf){
   const txns=pdfLinesToTxns(lines);
   if(!txns.length){ toast('Couldn’t find transactions in that PDF — try your bank’s CSV or Excel export',true); return; }
   addImported(txns);
-  toast(`Imported ${txns.length} from PDF — please check them`);
 }
 async function pdfToLines(lib,buf){
   const pdf=await lib.getDocument({data:new Uint8Array(buf)}).promise;
@@ -1435,26 +1523,231 @@ function isoDate(s){
   if(m){ let y=m[3]; if(y.length===2) y='20'+y; return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`; }
   const dt=new Date(s); return isNaN(dt)?s:dt.toISOString().slice(0,10);
 }
+/* ============================================================
+   IMPORT REVIEW (staging)
+   Imported statement lines no longer go straight into Transactions.
+   They land in state.staging, where you allocate / edit them, tick
+   "Yes" on the ones that are ready, then move them across in one go.
+   ============================================================ */
+let _layoutNote='';
+function goView(v){ const b=document.querySelector(`#nav button[data-view="${v}"]`); if(b) b.click(); }
+// description "fingerprint": drops reference numbers & punctuation so
+// "POS PURCHASE WOOLWORTHS 482913" matches "Pos Purchase Woolworths 110022"
+function normKey(s){ return String(s||'').toLowerCase().replace(/\d{3,}/g,' ').replace(/[^a-z]+/g,' ').trim(); }
+function ciFind(list,v){ v=String(v||'').trim().toLowerCase(); return v?(list||[]).find(x=>String(x).toLowerCase()===v):undefined; }
+
+/* Learn from what you've allocated before: description → last type/allocation used */
+function learnedAllocations(){
+  const map={};
+  state.transactions.slice().sort((a,b)=>(a.date<b.date?-1:a.date>b.date?1:0)).forEach(t=>{
+    const k=normKey(t.description); if(k && t.allocation) map[k]={type:t.type, allocation:t.allocation};
+  });
+  return map;
+}
+
+/* entry point used by CSV / Excel / PDF import → stage instead of posting */
 function addImported(txns){
   if(txns===null){ toast('No rows found — a header row plus data is needed',true); return; }
   if(!txns.length){ toast('No transactions found in that file',true); return; }
-  const defPerson=(state.settings&&state.settings.userName)||state.lists.persons[0]||'';
-  let added=0;
+  const learned=learnedAllocations();
+  const defPerson=ciFind(state.lists.persons,state.settings&&state.settings.userName)||state.lists.persons[0]||'';
+  const defAcct=state.lists.accounts[0]||'';
+  const when=new Date().toISOString();
+  let n=0, sug=0;
   txns.forEach(t=>{
-    const type=TYPES.includes(t.type)?t.type:'Expense';
-    const alloc=(t.allocation||'').trim();
-    if(alloc){ const L=state.lists.allocations[type]||(state.lists.allocations[type]=[]);
-      if(!L.some(a=>a.toLowerCase()===alloc.toLowerCase())) L.push(alloc); }
-    let acct=(t.account||'').trim();
-    if(acct){ if(!state.lists.accounts.some(a=>a.toLowerCase()===acct.toLowerCase())){ if(state.lists.accounts.length<LIST_LIMITS.accounts) state.lists.accounts.push(acct); } }
-    else acct=state.lists.accounts[0]||'';
-    const person=(t.person||'').trim()||defPerson;
-    if(person && !state.lists.persons.some(p=>p.toLowerCase()===person.toLowerCase()) && state.lists.persons.length<LIST_LIMITS.persons) state.lists.persons.push(person);
-    state.transactions.push({ id:uid(), date:t.date, description:t.description||'', type,
-      allocation:alloc, amount:Math.abs(Number(t.amount))||0, account:acct, person, notes:t.notes||'' });
-    added++;
+    let type=TYPES.includes(t.type)?t.type:'Expense';
+    let alloc=(t.allocation||'').trim(), suggested=false;
+    if(!alloc){
+      const L=learned[normKey(t.description)];
+      // only reuse if money direction agrees (in = Income; out = Expense/Deduction)
+      if(L && ((L.type==='Income')===(type==='Income'))){ type=L.type; alloc=L.allocation; suggested=true; sug++; }
+    }
+    alloc = ciFind(state.lists.allocations[type],alloc) || alloc;
+    const acct = ciFind(state.lists.accounts,t.account) || (t.account||'').trim() || defAcct;
+    const person = ciFind(state.lists.persons,t.person) || (t.person||'').trim() || defPerson;
+    state.staging.push({ id:uid(), date:t.date||'', description:t.description||'', type,
+      allocation:alloc, amount:Math.abs(Number(t.amount))||0, account:acct, person, notes:t.notes||'',
+      ready:false, suggested, importedAt:when });
+    n++;
   });
-  save(); render(); toast(`Imported ${added} transaction(s)`);
+  save(); goView('staging');
+  toast(`${n} item(s) added to Import review`+(sug?` · ${sug} auto-allocated from history`:'')+_layoutNote);
+}
+
+/* what's still missing before an item may be ticked Yes */
+function stProblem(s){
+  if(!s.date || !/^\d{4}-\d{2}-\d{2}$/.test(s.date)) return 'a valid date';
+  if(!(Number(s.amount)>0)) return 'an amount';
+  if(!String(s.allocation||'').trim()) return 'an allocation';
+  return '';
+}
+function dupKey(t){ return `${t.date}|${(Math.abs(Number(t.amount))||0).toFixed(2)}|${normKey(t.description)}`; }
+function stDupInfo(){
+  const inTx=new Set(state.transactions.map(dupKey)), seen={}, out={};
+  state.staging.forEach(s=>{ const k=dupKey(s);
+    if(inTx.has(k)) out[s.id]='Already in Transactions';
+    else if(seen[k]) out[s.id]='Repeated in this review';
+    seen[k]=true; });
+  return out;
+}
+
+function updateStageBadge(){ const b=document.getElementById('stBadge'); if(b) b.textContent=(state.staging||[]).length||''; }
+function renderStageBanner(){
+  const el=document.getElementById('stageBanner'); if(!el) return;
+  const n=(state.staging||[]).length;
+  el.style.display=n?'':'none';
+  if(n) el.innerHTML=`<span>📥 <b>${n}</b> imported item${n!==1?'s are':' is'} waiting in <b>Import review</b> — allocate and tick them there to add them here.</span><button class="btn primary sm" onclick="goView('staging')">Review now</button>`;
+}
+
+function stOpts(items,cur,placeholder){
+  let h=placeholder?`<option value="">${placeholder}</option>`:'';
+  const c=String(cur||'');
+  if(c && !items.includes(c)) h+=`<option value="${esc(c)}" selected>${esc(c)} (new)</option>`;
+  return h+items.map(i=>`<option${i===c?' selected':''}>${esc(i)}</option>`).join('');
+}
+function renderStaging(){
+  const body=document.getElementById('stBody'); if(!body) return;
+  const all=state.staging||[];
+  const dups=stDupInfo();
+  const q=(val('stSearch')||'').toLowerCase(), f=val('stFilter')||'all';
+  const rows=all.filter(s=>
+    (f==='all' || (f==='todo'&&!String(s.allocation||'').trim()) || (f==='ready'&&s.ready) || (f==='notready'&&!s.ready) || (f==='dup'&&dups[s.id])) &&
+    (!q || (s.description||'').toLowerCase().includes(q) || (s.notes||'').toLowerCase().includes(q) || (s.allocation||'').toLowerCase().includes(q)))
+    .sort((a,b)=>(a.date<b.date?-1:a.date>b.date?1:0));
+
+  if(!all.length){
+    body.innerHTML=`<tr><td colspan="11"><div class="empty"><div class="big">📥</div><h3>Nothing waiting for review</h3><div>Use <b>Import statement</b> to bring in a CSV, Excel or PDF bank statement. Its lines will appear here for you to allocate before they go into Transactions.</div></div></td></tr>`;
+  } else if(!rows.length){
+    body.innerHTML=`<tr><td colspan="11"><div class="empty" style="padding:24px"><div class="tiny">No items match this filter.</div></div></td></tr>`;
+  } else {
+    body.innerHTML=rows.map(s=>{
+      const miss=stProblem(s), noAlloc=!String(s.allocation||'').trim();
+      const out=s.type!=='Income';
+      return `<tr class="${s.ready?'st-ready':''}">
+        <td><input type="checkbox" class="stSel" data-id="${s.id}" onchange="stSelChanged()" style="margin-top:8px"></td>
+        <td><label class="st-yes" title="${miss?'Needs '+miss+' first':'Ready to move'}"><input type="checkbox" ${s.ready?'checked':''} onchange="stReady('${s.id}',this.checked)">Yes</label></td>
+        <td><input type="date" class="field st-date" value="${esc(s.date||'')}" onchange="stSet('${s.id}','date',this.value)"></td>
+        <td><input class="field st-desc" value="${esc(s.description||'')}" onchange="stSet('${s.id}','description',this.value)">
+          ${(dups[s.id]||s.suggested)?`<div class="st-flags">${dups[s.id]?`<span class="pill dup">⚠ ${dups[s.id]}</span>`:''}${s.suggested?`<span class="pill sugg" title="Allocated from a matching past transaction — check it">✨ Suggested</span>`:''}</div>`:''}</td>
+        <td><select class="field" style="min-width:108px" onchange="stSet('${s.id}','type',this.value)">${TYPES.map(t=>`<option${t===s.type?' selected':''}>${t}</option>`).join('')}</select></td>
+        <td><select class="field st-sel${noAlloc?' st-missing':''}" onchange="stSet('${s.id}','allocation',this.value)">${stOpts(state.lists.allocations[s.type]||[],s.allocation,'— choose —')}</select></td>
+        <td><input type="number" step="0.01" min="0" class="field num st-amt" value="${Number(s.amount)>0?Number(s.amount).toFixed(2):''}" onchange="stSet('${s.id}','amount',this.value)">
+          <div class="st-dir ${out?'neg':'pos'}">${out?'money out':'money in'}</div></td>
+        <td><select class="field st-sel" onchange="stSet('${s.id}','account',this.value)">${stOpts(state.lists.accounts,s.account)}</select></td>
+        <td><select class="field st-sel" style="min-width:100px" onchange="stSet('${s.id}','person',this.value)">${stOpts(state.lists.persons,s.person)}</select></td>
+        <td><input class="field st-notes" value="${esc(s.notes||'')}" placeholder="—" onchange="stSet('${s.id}','notes',this.value)"></td>
+        <td><button class="btn ghost sm" title="Remove from review (not imported)" onclick="stRemove(['${s.id}'])">×</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  // summary cards + move button
+  const ready=all.filter(s=>s.ready), todo=all.filter(s=>!String(s.allocation||'').trim()).length, nd=Object.keys(dups).length;
+  const rin=sum(ready.filter(s=>s.type==='Income').map(s=>s.amount)), rout=sum(ready.filter(s=>s.type!=='Income').map(s=>s.amount));
+  const card=(lab,v,col,sub)=>`<div class="card pad"><div class="tiny">${lab}</div><div class="num" style="font-size:22px; font-weight:800; margin-top:4px; color:${col}">${v}</div>${sub?`<div class="tiny" style="margin-top:2px">${sub}</div>`:''}</div>`;
+  document.getElementById('stCards').innerHTML =
+    card('In review', all.length, 'var(--text)') +
+    card('Need allocation', todo, todo?'var(--expense)':'var(--income)') +
+    card('Ticked Yes', ready.length, 'var(--income)', ready.length?`in ${fmt0(rin)} · out ${fmt0(rout)}`:'') +
+    card('Possible duplicates', nd, nd?'var(--expense)':'var(--text)');
+  const pb=document.getElementById('stPostBtn');
+  if(pb){ pb.disabled=!ready.length; pb.textContent = ready.length?`➜ Move ${ready.length} ticked to Transactions`:'➜ Move ticked to Transactions'; }
+  document.getElementById('stSelAll').checked=false;
+  stSelChanged(); updateStageBadge();
+}
+
+/* inline edits */
+function stFind(id){ return (state.staging||[]).find(s=>s.id===id); }
+function stSet(id,field,value){
+  const s=stFind(id); if(!s) return;
+  if(field==='amount') s.amount=Math.abs(Number(value))||0;
+  else s[field]=String(value==null?'':value).trim();
+  if(field==='type'){ const L=state.lists.allocations[s.type]||[]; const hit=ciFind(L,s.allocation); s.allocation=hit||''; }
+  if(field==='allocation'||field==='type') s.suggested=false;
+  if(s.ready && stProblem(s)){ s.ready=false; toast(`Unticked — it needs ${stProblem(s)}`,true); }
+  save(); renderStaging();
+}
+function stReady(id,on){
+  const s=stFind(id); if(!s) return;
+  const p=on?stProblem(s):'';
+  if(p){ toast(`Add ${p} before ticking Yes`,true); renderStaging(); return; }
+  s.ready=!!on; if(on) s.suggested=false;
+  save(); renderStaging();
+}
+
+/* row selection (left box) for bulk actions */
+function stSelIds(){ return [...document.querySelectorAll('.stSel:checked')].map(c=>c.dataset.id); }
+function stSelectAll(on){ document.querySelectorAll('.stSel').forEach(c=>c.checked=on); stSelChanged(); }
+function stSelChanged(){
+  const n=stSelIds().length;
+  document.querySelectorAll('.stSelBtn').forEach(b=>b.disabled=!n);
+  const i=document.getElementById('stSelInfo');
+  if(i) i.textContent = n?`${n} row(s) selected`:'Select rows with the left box to edit several at once.';
+}
+function stMarkSelected(on){
+  const ids=stSelIds(); let n=0, blocked=0;
+  ids.forEach(id=>{ const s=stFind(id); if(!s) return;
+    if(on && stProblem(s)){ blocked++; return; }
+    s.ready=!!on; if(on) s.suggested=false; n++; });
+  save(); renderStaging();
+  toast(on ? `Ticked ${n} as Yes`+(blocked?` · ${blocked} skipped (still need an allocation, date or amount)`:'') : `Unticked ${n}`, on&&blocked>0);
+}
+function stApplyBulk(ids,ty,al,ac,pe){
+  let n=0;
+  ids.forEach(id=>{ const s=stFind(id); if(!s) return;
+    if(ty) s.type=ty;
+    if(al){
+      // if the chosen allocation belongs to a different type, switch the type to match
+      if(!ty && !(state.lists.allocations[s.type]||[]).includes(al)){
+        const t2=TYPES.find(t=>(state.lists.allocations[t]||[]).includes(al)); if(t2) s.type=t2;
+      }
+      s.allocation=al;
+    } else if(ty && !(state.lists.allocations[s.type]||[]).includes(s.allocation)) s.allocation='';
+    if(ac) s.account=ac; if(pe) s.person=pe;
+    if(ty||al) s.suggested=false;
+    if(s.ready && stProblem(s)) s.ready=false;
+    n++; });
+  return n;
+}
+function stRemove(ids){
+  if(!ids.length) return;
+  if(ids.length>1 && !confirm(`Remove ${ids.length} item(s) from Import review? They will not be imported.`)) return;
+  state.staging=state.staging.filter(s=>!ids.includes(s.id));
+  save(); render(); toast(`Removed ${ids.length} item(s)`);
+}
+function stRemoveSelected(){ stRemove(stSelIds()); }
+function stClearAll(){
+  if(!state.staging.length) return;
+  if(!confirm(`Clear all ${state.staging.length} item(s) from Import review? Nothing will be imported.`)) return;
+  state.staging=[]; save(); render(); toast('Import review cleared');
+}
+
+/* move every item ticked Yes into Transactions */
+function postReady(){
+  const ready=state.staging.filter(s=>s.ready);
+  if(!ready.length){ toast('Tick Yes on the items that are ready first',true); return; }
+  const bad=ready.filter(s=>stProblem(s));
+  if(bad.length){ toast(`${bad.length} ticked item(s) are missing details — please check them`,true); return; }
+  const dups=stDupInfo(), nd=ready.filter(s=>dups[s.id]).length;
+  if(nd && !confirm(`${nd} of the ticked item(s) look like duplicates. Move them to Transactions anyway?\n\n(Cancel to go back and untick or remove them.)`)) return;
+  ready.forEach(s=>{
+    const type=TYPES.includes(s.type)?s.type:'Expense';
+    const alloc=String(s.allocation||'').trim();
+    const L=state.lists.allocations[type]||(state.lists.allocations[type]=[]);
+    if(!ciFind(L,alloc)) L.push(alloc);
+    let acct=String(s.account||'').trim();
+    if(acct && !ciFind(state.lists.accounts,acct)){ if(state.lists.accounts.length<LIST_LIMITS.accounts) state.lists.accounts.push(acct); else acct=state.lists.accounts[0]||acct; }
+    let person=String(s.person||'').trim();
+    if(person && !ciFind(state.lists.persons,person)){ if(state.lists.persons.length<LIST_LIMITS.persons) state.lists.persons.push(person); else person=state.lists.persons[0]||person; }
+    state.transactions.push({ id:uid(), date:s.date, description:s.description||'', type,
+      allocation:ciFind(L,alloc)||alloc, amount:Math.abs(Number(s.amount))||0,
+      account:ciFind(state.lists.accounts,acct)||acct, person:ciFind(state.lists.persons,person)||person, notes:s.notes||'' });
+  });
+  const ids=new Set(ready.map(s=>s.id));
+  state.staging=state.staging.filter(s=>!ids.has(s.id));
+  save(); render();
+  const left=state.staging.length;
+  toast(`Moved ${ready.length} to Transactions`+(left?` · ${left} still in review`:''));
 }
 
 /* ---------- Column-matching dialog (map a bank layout once, save it) ---------- */
@@ -2020,9 +2313,11 @@ create policy "change own" on public.app_state for update using (auth.uid() = us
 function activeView(){ const b=document.querySelector('#nav button.active'); return b?b.dataset.view:'dashboard'; }
 function render(){
   refreshDropdowns();
+  updateStageBadge();
   switch(activeView()){
     case 'dashboard': renderDashboard(); break;
     case 'transactions': renderTxns(); break;
+    case 'staging': renderStaging(); break;
     case 'budget': renderBudget(); break;
     case 'reports': renderReports(); break;
     case 'tax': renderTax(); break;
