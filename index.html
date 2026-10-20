@@ -815,8 +815,25 @@ function save(){ localStorage.setItem(LS, JSON.stringify(state)); if(cloudOn()) 
 function load(){
   const raw = localStorage.getItem(LS);
   if(raw){ try{ state = JSON.parse(raw); }catch(e){ state = null; } }
-  if(!state){ state = blankState(); seedSample(); localStorage.setItem(LS, JSON.stringify(state)); }
+  if(!state){ state = blankState(); seedSample(); }
   normalizeState();
+  localStorage.setItem(LS, JSON.stringify(state));
+}
+// Bank account protection: keep only the last 4 digits of any account number
+// e.g. "Capitec 1234 5678 90" -> "Capitec ••••7890". Safe to run more than once.
+function maskAcct(v){
+  return String(v==null?'':v).replace(/\d[\d\s-]*\d/g, m=>{
+    const d=m.replace(/\D/g,''); return d.length>4 ? '••••'+d.slice(-4) : m;
+  }).trim();
+}
+function maskAllAccounts(){
+  if(state.lists && Array.isArray(state.lists.accounts)){
+    const seen=new Set(), out=[];
+    state.lists.accounts.forEach(a=>{ const m=maskAcct(a); if(m && !seen.has(m.toLowerCase())){ seen.add(m.toLowerCase()); out.push(m); } });
+    state.lists.accounts=out;
+  }
+  (state.transactions||[]).forEach(t=>{ if(t.account) t.account=maskAcct(t.account); });
+  (state.archived||[]).forEach(t=>{ if(t.account) t.account=maskAcct(t.account); });
 }
 // Fill in any missing/older fields — used on local load AND after a cloud pull
 function normalizeState(){
@@ -833,6 +850,7 @@ function normalizeState(){
   if(Array.isArray(state.lists.claimable)){
     const o={}; state.lists.claimable.forEach(k=>o[k]=100); state.lists.claimable=o;
   }
+  maskAllAccounts();
 }
 
 /* ---------- sample data (opens populated) ---------- */
@@ -1040,7 +1058,7 @@ function renderTxns(){
         <td><span class="pill ${t.type.toLowerCase()}">${t.type}</span></td>
         <td>${esc(t.allocation||'')}</td>
         <td class="r num ${s<0?'neg':'pos'}">${fmt(s)}</td>
-        <td>${esc(t.account||'')}</td>
+        <td>${esc(maskAcct(t.account||''))}</td>
         <td>${esc(t.person||'')}</td>
         <td>${monthOf(t.date)}</td>
         <td class="no-print"><button class="btn ghost sm" onclick="openTxn('${t.id}')">Edit</button></td>
@@ -1445,7 +1463,7 @@ function addImported(txns){
     const alloc=(t.allocation||'').trim();
     if(alloc){ const L=state.lists.allocations[type]||(state.lists.allocations[type]=[]);
       if(!L.some(a=>a.toLowerCase()===alloc.toLowerCase())) L.push(alloc); }
-    let acct=(t.account||'').trim();
+    let acct=maskAcct(t.account||'');
     if(acct){ if(!state.lists.accounts.some(a=>a.toLowerCase()===acct.toLowerCase())){ if(state.lists.accounts.length<LIST_LIMITS.accounts) state.lists.accounts.push(acct); } }
     else acct=state.lists.accounts[0]||'';
     const person=(t.person||'').trim()||defPerson;
@@ -1756,7 +1774,8 @@ function removeAlloc(type,i){
 }
 const LIST_LIMITS={accounts:10, persons:3};
 function addSimple(key,inputId){
-  const inp=document.getElementById(inputId); const v=inp.value.trim(); if(!v) return;
+  const inp=document.getElementById(inputId); let v=inp.value.trim(); if(!v) return;
+  if(key==='accounts') v=maskAcct(v);
   const lim=LIST_LIMITS[key];
   if(lim && state.lists[key].length>=lim && !state.lists[key].some(x=>x.toLowerCase()===v.toLowerCase())){
     toast(`You can have at most ${lim} ${key==='accounts'?'bank accounts':'people'}`,true); return;
@@ -1850,7 +1869,10 @@ async function cloudPull(){
       const keepUrl=cfgUrl(), keepKey=cfgKey();
       state=rows[0].state; state.settings=state.settings||{};
       state.settings.supaUrl=keepUrl; state.settings.supaKey=keepKey;
+      const acctBefore=JSON.stringify([state.lists&&state.lists.accounts,(state.transactions||[]).map(t=>t.account)]);
       normalizeState(); localStorage.setItem(LS,JSON.stringify(state));
+      const acctAfter=JSON.stringify([state.lists&&state.lists.accounts,(state.transactions||[]).map(t=>t.account)]);
+      if(acctBefore!==acctAfter) cloudPush(true);   // replace full account numbers in the cloud copy
     }else{
       await cloudPush(true);   // first login on a fresh account → upload what's here
     }
