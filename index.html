@@ -238,6 +238,30 @@ tr.tot td{font-weight:800; background:var(--accent-soft); border-top:2px solid v
 .chip button:hover{background:var(--expense); color:#fff}
 .add-inline{display:flex; gap:8px; margin-top:12px; max-width:420px}
 
+/* Import Statement (staging) page */
+nav.tabs button .nbadge{display:none; margin-left:6px; min-width:18px; height:18px; padding:0 5px; border-radius:999px; background:var(--expense); color:#fff; font-size:11px; font-weight:800; line-height:18px; text-align:center}
+nav.tabs button .nbadge.show{display:inline-block}
+.st-cards{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px}
+.st-card{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; box-shadow:var(--shadow)}
+.st-card .lab{font-size:11.5px; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); font-weight:700}
+.st-card .val{font-size:24px; font-weight:800; margin-top:6px}
+.st-card .sub{font-size:12px; color:var(--muted); margin-top:3px}
+.st-card.warn .val{color:var(--expense)} .st-card.ok .val{color:var(--income)} .st-card.dup .val{color:var(--deduction)}
+@media(max-width:900px){.st-cards{grid-template-columns:repeat(2,1fr)}}
+.st-actions{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px}
+.st-actions .grow{flex:1}
+#stTable td{vertical-align:top; padding-top:8px; padding-bottom:8px}
+.st-in{background:var(--panel-2); border:1px solid var(--line); border-radius:7px; padding:5px 7px; color:var(--text); font-size:12.5px; width:100%}
+.st-in:focus{outline:none; border-color:var(--brand-2)}
+.st-in.need{border-color:var(--expense); box-shadow:0 0 0 2px var(--expense-soft)}
+#stTable tr.need-row td:first-child{box-shadow:inset 3px 0 0 var(--expense)}
+.st-tag{display:inline-block; margin:4px 4px 0 0; padding:1px 7px; border-radius:999px; font-size:11px; font-weight:700}
+.st-tag.sug{background:var(--chip); color:var(--brand)}
+.st-tag.dup{background:var(--deduction-soft); color:var(--deduction)}
+.st-yes{display:flex; align-items:center; gap:5px; font-size:12.5px; font-weight:700; white-space:nowrap}
+.banner{display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:12px 16px; margin-bottom:16px; border-radius:var(--radius); border:1px solid var(--deduction); background:var(--deduction-soft); font-size:13.5px}
+.banner .btn{margin-left:auto}
+
 /* import dropdown */
 .dropdown{position:relative; display:inline-block}
 .dropdown-menu{position:absolute; top:calc(100% + 6px); right:0; z-index:60; min-width:210px; background:var(--panel); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); padding:6px; display:none}
@@ -344,6 +368,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
     <nav class="tabs" id="nav">
       <button data-view="dashboard" class="active"><span class="ic">📊</span>Dashboard</button>
       <button data-view="transactions"><span class="ic">💳</span>Transactions</button>
+      <button data-view="staging"><span class="ic">📥</span>Import Statement<span class="nbadge" id="stagingBadge"></span></button>
       <button data-view="budget"><span class="ic">🎯</span>Budget</button>
       <button data-view="reports"><span class="ic">📑</span>Reports</button>
       <button data-view="tax"><span class="ic">🧾</span>Tax</button>
@@ -417,20 +442,13 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
           <p class="desc">Capture every income, expense &amp; deduction. Expenses are stored as money out automatically.</p>
         </div>
         <div class="no-print" style="display:flex; gap:8px; flex-wrap:wrap">
-          <div class="dropdown" id="importDrop">
-            <button class="btn ghost" onclick="toggleImportMenu(event)">📥 Import ▾</button>
-            <div class="dropdown-menu" id="importMenu">
-              <button type="button" onclick="pickImport('csv')">CSV file <span class="tiny">.csv</span></button>
-              <button type="button" onclick="pickImport('xlsx')">Excel file <span class="tiny">.xlsx</span></button>
-              <button type="button" onclick="pickImport('pdf')">PDF statement <span class="tiny">.pdf</span></button>
-            </div>
-          </div>
           <button class="btn ghost" onclick="exportCsv()">📤 Export CSV</button>
           <button class="btn ghost" onclick="openArchive()">🗄 Archive</button>
           <button class="btn primary" onclick="openTxn()">＋ New transaction</button>
         </div>
       </div>
 
+      <div id="stagingBanner" class="no-print"></div>
       <div class="filters no-print">
         <div class="fx"><label>Search</label><input class="field" id="txSearch" placeholder="Description, notes…" oninput="renderTxns()" style="min-width:200px"></div>
         <div class="fx"><label>Type</label><select class="field" id="txType" onchange="renderTxns()"><option>All</option><option>Income</option><option>Expense</option><option>Deduction</option></select></div>
@@ -455,6 +473,65 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
               <th class="r">Amount</th><th>Account</th><th>Person</th><th>Month</th><th class="no-print"></th>
             </tr></thead>
             <tbody id="txBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ IMPORT STATEMENT (staging) ============ -->
+    <section class="view" id="view-staging">
+      <div class="page-head">
+        <div>
+          <div class="eyebrow">Check before you post</div>
+          <h2>Import Statement</h2>
+          <p class="desc">Imported bank lines wait here. Allocate and check each one, tick <b>Yes</b>, then move the ticked lines to Transactions.</p>
+        </div>
+        <div class="no-print" style="display:flex; gap:8px; flex-wrap:wrap">
+          <div class="dropdown" id="importDrop">
+            <button class="btn primary" onclick="toggleImportMenu(event)">📥 Import statement ▾</button>
+            <div class="dropdown-menu" id="importMenu">
+              <button type="button" onclick="pickImport('csv')">CSV file <span class="tiny">.csv</span></button>
+              <button type="button" onclick="pickImport('xlsx')">Excel file <span class="tiny">.xlsx</span></button>
+              <button type="button" onclick="pickImport('pdf')">PDF statement <span class="tiny">.pdf</span></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="st-cards" id="stCards"></div>
+
+      <div class="filters no-print">
+        <div class="fx"><label>Search</label><input class="field" id="stSearch" placeholder="Description, notes…" oninput="renderStaging()" style="min-width:180px"></div>
+        <div class="fx"><label>Show</label><select class="field" id="stShow" onchange="renderStaging()">
+          <option value="all">All</option><option value="need">Needs allocation</option><option value="notyes">Not ticked yet</option><option value="yes">Ticked Yes</option><option value="dup">Possible duplicates</option>
+        </select></div>
+        <div class="fx"><label>Type</label><select class="field" id="stType" onchange="stTypeFilterChanged()"><option>All</option><option>Income</option><option>Expense</option><option>Deduction</option></select></div>
+        <div class="fx"><label>Allocation</label><select class="field" id="stAlloc" onchange="renderStaging()"></select></div>
+        <div class="flush"><button class="btn ghost sm" onclick="stClearFilters()">Clear filters</button></div>
+      </div>
+
+      <div class="st-actions no-print">
+        <button class="btn ghost sm stsel-btn" onclick="stTickSelected(true)" disabled>✔ Tick Yes on selected</button>
+        <button class="btn ghost sm stsel-btn" onclick="stTickSelected(false)" disabled>Untick selected</button>
+        <button class="btn ghost sm stsel-btn" onclick="openBulk('staging')" disabled>✏ Edit selected</button>
+        <button class="btn danger sm stsel-btn" onclick="stRemoveSelected()" disabled>🗑 Remove selected</button>
+        <button class="btn ghost sm" onclick="stClearAll()">Clear all</button>
+        <span class="grow"></span>
+        <button class="btn ghost sm" onclick="stTickAllReady()">✔ Tick all as ready</button>
+        <button class="btn primary sm" id="stMoveBtn" onclick="stMoveTicked()">➜ Move ticked to Transactions</button>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><h3 id="stCount">Import Statement</h3><span class="hint">Yes can only be ticked when a line has a date, an amount above 0 and an allocation.</span></div>
+        <div class="table-wrap table-scroll">
+          <table id="stTable">
+            <thead><tr>
+              <th style="width:34px"><input type="checkbox" id="stSelAll" title="Select all shown" onclick="stSelectAll(this.checked)"></th>
+              <th>Ready?</th><th style="min-width:130px">Date</th><th style="min-width:220px">Description</th><th style="min-width:110px">Type</th>
+              <th style="min-width:160px">Allocation</th><th class="r" style="min-width:130px">Amount</th><th style="min-width:140px">Account</th>
+              <th style="min-width:110px">Person</th><th style="min-width:140px">Notes</th>
+            </tr></thead>
+            <tbody id="stBody"></tbody>
           </table>
         </div>
       </div>
@@ -720,7 +797,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
     </div>
     <div class="modal-f">
       <button class="btn ghost" onclick="closeMap()">Cancel</button>
-      <button class="btn primary" onclick="confirmMapping()">Import</button>
+      <button class="btn primary" onclick="confirmMapping()">Send to Import Statement</button>
     </div>
   </div>
 </div>
@@ -834,11 +911,13 @@ function maskAllAccounts(){
   }
   (state.transactions||[]).forEach(t=>{ if(t.account) t.account=maskAcct(t.account); });
   (state.archived||[]).forEach(t=>{ if(t.account) t.account=maskAcct(t.account); });
+  (state.staging||[]).forEach(t=>{ if(t.account) t.account=maskAcct(t.account); });
 }
 // Fill in any missing/older fields — used on local load AND after a cloud pull
 function normalizeState(){
   if(!state.transactions) state.transactions = [];
   if(!Array.isArray(state.archived)) state.archived = [];
+  if(!Array.isArray(state.staging)) state.staging = [];
   if(!state.settings) state.settings = {supaUrl:'',supaKey:'',userName:''};
   if(!state.settings.currency || !state.settings.currency.symbol) state.settings.currency = {code:'ZAR',symbol:'R'};
   if(state.settings.userName===undefined) state.settings.userName = (state.lists&&state.lists.persons&&state.lists.persons[0])||'';
@@ -1133,22 +1212,28 @@ function purgeArchived(id){
 }
 
 /* ---- bulk edit ticked ---- */
-function openBulk(){
-  const ids=tickedIds(); if(!ids.length) return;
-  document.getElementById('bulkCount').textContent=`${ids.length} transaction(s) selected.`;
+let _bulkMode='txn';
+function openBulk(mode){
+  _bulkMode = mode==='staging' ? 'staging' : 'txn';
+  const ids = _bulkMode==='staging' ? stSelIds() : tickedIds(); if(!ids.length) return;
+  document.getElementById('bulkCount').textContent=`${ids.length} ${_bulkMode==='staging'?'import line':'transaction'}(s) selected.`;
   document.getElementById('bulkType').value='';
-  fillBulkSelect('bulkAlloc', allAllocations());
-  fillBulkSelect('bulkAccount', state.lists.accounts);
-  fillBulkSelect('bulkPerson', state.lists.persons);
+  fillBulkSelect('bulkAlloc', _bulkMode==='staging' ? stAllocsFor('All') : allAllocations());
+  fillBulkSelect('bulkAccount', _bulkMode==='staging' ? stAccounts() : state.lists.accounts);
+  fillBulkSelect('bulkPerson', _bulkMode==='staging' ? stPersons() : state.lists.persons);
   document.getElementById('bulkModal').classList.add('show');
 }
 function fillBulkSelect(id,items){ document.getElementById(id).innerHTML='<option value="">— keep —</option>'+items.map(i=>`<option>${esc(i)}</option>`).join(''); }
 function closeBulk(){ document.getElementById('bulkModal').classList.remove('show'); }
 function applyBulk(){
-  const ids=tickedIds(); if(!ids.length){ closeBulk(); return; }
+  const ids = _bulkMode==='staging' ? stSelIds() : tickedIds(); if(!ids.length){ closeBulk(); return; }
   const ty=val('bulkType'), al=val('bulkAlloc'), ac=val('bulkAccount'), pe=val('bulkPerson');
   if(!ty&&!al&&!ac&&!pe){ toast('Choose at least one field to change',true); return; }
   let n=0;
+  if(_bulkMode==='staging'){
+    stg().forEach(r=>{ if(ids.includes(r.id)){ if(ty){r.type=ty; r.suggested=false;} if(al){r.allocation=al; r.suggested=false;} if(ac)r.account=ac; if(pe)r.person=pe; if(r.ready&&!stComplete(r)) r.ready=false; n++; } });
+    save(); closeBulk(); renderStaging(); toast(`Updated ${n} import line(s)`); return;
+  }
   state.transactions.forEach(t=>{ if(ids.includes(t.id)){ if(ty)t.type=ty; if(al)t.allocation=al; if(ac)t.account=ac; if(pe)t.person=pe; n++; } });
   save(); closeBulk(); render(); toast(`Updated ${n} transaction(s)`);
 }
@@ -1299,7 +1384,7 @@ function beginTabularImport(rows){
   const sig=makeSig(header);
   if(sig===MAP_NATIVE){ addImported(rowsToTxns(rows)); return; }
   const saved=(state.lists.importMappings||[]).find(m=>m.sig===sig);
-  if(saved){ addImported(applyMapping(rows,saved)); toast(`Used your “${saved.name}” layout`); return; }
+  if(saved){ addImported(applyMapping(rows,saved), `used your “${saved.name}” layout`); return; }
   openMapDialog(rows,header,sig);
 }
 function guessCols(header){
@@ -1412,8 +1497,7 @@ async function importPdf(buf){
   let lines; try{ lines=await pdfToLines(lib,buf); }catch(e){ console.warn(e); toast('Could not read that PDF',true); return; }
   const txns=pdfLinesToTxns(lines);
   if(!txns.length){ toast('Couldn’t find transactions in that PDF — try your bank’s CSV or Excel export',true); return; }
-  addImported(txns);
-  toast(`Imported ${txns.length} from PDF — please check them`);
+  addImported(txns, 'from PDF, please check them');
 }
 async function pdfToLines(lib,buf){
   const pdf=await lib.getDocument({data:new Uint8Array(buf)}).promise;
@@ -1453,26 +1537,220 @@ function isoDate(s){
   if(m){ let y=m[3]; if(y.length===2) y='20'+y; return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`; }
   const dt=new Date(s); return isNaN(dt)?s:dt.toISOString().slice(0,10);
 }
-function addImported(txns){
+function addImported(txns, note){
   if(txns===null){ toast('No rows found — a header row plus data is needed',true); return; }
-  if(!txns.length){ toast('No transactions found in that file',true); return; }
+  if(!txns || !txns.length){ toast('No transactions found in that file',true); return; }
   const defPerson=(state.settings&&state.settings.userName)||state.lists.persons[0]||'';
-  let added=0;
+  const hist=stHistoryMap();
+  if(!Array.isArray(state.staging)) state.staging=[];
+  let added=0, sug=0;
   txns.forEach(t=>{
-    const type=TYPES.includes(t.type)?t.type:'Expense';
-    const alloc=(t.allocation||'').trim();
-    if(alloc){ const L=state.lists.allocations[type]||(state.lists.allocations[type]=[]);
-      if(!L.some(a=>a.toLowerCase()===alloc.toLowerCase())) L.push(alloc); }
-    let acct=maskAcct(t.account||'');
-    if(acct){ if(!state.lists.accounts.some(a=>a.toLowerCase()===acct.toLowerCase())){ if(state.lists.accounts.length<LIST_LIMITS.accounts) state.lists.accounts.push(acct); } }
-    else acct=state.lists.accounts[0]||'';
+    let type=TYPES.includes(t.type)?t.type:'Expense';
+    const dir = type==='Income' ? 'in' : 'out';          // money direction from the statement
+    let alloc=(t.allocation||'').trim(), suggested=false;
+    if(!alloc){
+      const h=hist[stNormDesc(t.description)];
+      if(h && (dir==='in' ? h.type==='Income' : h.type!=='Income')){ type=h.type; alloc=h.allocation; suggested=true; sug++; }
+    }
+    let acct=maskAcct(t.account||''); if(!acct) acct=state.lists.accounts[0]||'';
     const person=(t.person||'').trim()||defPerson;
-    if(person && !state.lists.persons.some(p=>p.toLowerCase()===person.toLowerCase()) && state.lists.persons.length<LIST_LIMITS.persons) state.lists.persons.push(person);
-    state.transactions.push({ id:uid(), date:t.date, description:t.description||'', type,
-      allocation:alloc, amount:Math.abs(Number(t.amount))||0, account:acct, person, notes:t.notes||'' });
+    state.staging.push({ id:uid(), date:t.date||'', description:t.description||'', type, allocation:alloc,
+      amount:Math.round((Math.abs(Number(t.amount))||0)*100)/100, account:acct, person, notes:t.notes||'',
+      ready:false, suggested, dir });
     added++;
   });
-  save(); render(); toast(`Imported ${added} transaction(s)`);
+  save(); goView('staging');
+  toast(`${added} line(s) sent to Import Statement`+(sug?` · ${sug} suggested`:'')+(note?` · ${note}`:''));
+}
+
+/* ============================================================
+   IMPORT STATEMENT (staging) — check, allocate, then move to Transactions
+   ============================================================ */
+function stg(){ if(!Array.isArray(state.staging)) state.staging=[]; return state.staging; }
+function goView(v){ const b=document.querySelector(`#nav button[data-view="${v}"]`); if(b) b.click(); }
+// Match descriptions while ignoring long reference numbers / punctuation
+function stNormDesc(d){ return String(d||'').toLowerCase().replace(/\d{4,}/g,' ').replace(/[^a-z0-9 ]+/g,' ').replace(/\s+/g,' ').trim(); }
+function stHistoryMap(){
+  const m={};
+  state.transactions.slice().sort((a,b)=>(a.date<b.date?-1:1)).forEach(t=>{   // newest wins
+    const k=stNormDesc(t.description); if(k && t.allocation) m[k]={type:t.type, allocation:t.allocation};
+  });
+  return m;
+}
+function stComplete(r){ return !!(r.date && Number(r.amount)>0 && (r.allocation||'').trim()); }
+function stKey(r){ return [r.date, (Math.round(Number(r.amount)*100)/100).toFixed(2), String(r.description||'').toLowerCase().replace(/\s+/g,' ').trim()].join('|'); }
+function stDupInfo(){
+  const inTx=new Set(state.transactions.map(stKey)), cnt={};
+  stg().forEach(r=>{ const k=stKey(r); cnt[k]=(cnt[k]||0)+1; });
+  const out={};
+  stg().forEach(r=>{ const k=stKey(r); out[r.id]={ tx:inTx.has(k), rep:cnt[k]>1 }; });
+  return out;
+}
+function stAllocsFor(type){
+  const base = type && type!=='All' ? (state.lists.allocations[type]||[]) : allAllocations();
+  const extra = stg().filter(r=>r.allocation && (!type||type==='All'||r.type===type)).map(r=>r.allocation);
+  const seen=new Set(), out=[];
+  [...base, ...extra].forEach(a=>{ const k=a.toLowerCase(); if(!seen.has(k)){ seen.add(k); out.push(a); } });
+  return out;
+}
+function stAccounts(){
+  const seen=new Set(), out=[];
+  [...state.lists.accounts, ...stg().map(r=>r.account).filter(Boolean)].forEach(a=>{ const k=a.toLowerCase(); if(!seen.has(k)){ seen.add(k); out.push(a); } });
+  return out;
+}
+function stPersons(){
+  const seen=new Set(), out=[];
+  [...state.lists.persons, ...stg().map(r=>r.person).filter(Boolean)].forEach(a=>{ const k=a.toLowerCase(); if(!seen.has(k)){ seen.add(k); out.push(a); } });
+  return out;
+}
+function stOpts(items, cur, blank){
+  let h = blank!==undefined ? `<option value="">${blank}</option>` : '';
+  if(cur && !items.includes(cur)) items=[cur, ...items];
+  return h + items.map(i=>`<option${i===cur?' selected':''}>${esc(i)}</option>`).join('');
+}
+function updateStagingBadge(){
+  const n=stg().length, b=document.getElementById('stagingBadge');
+  if(b){ b.textContent=n; b.classList.toggle('show', n>0); }
+  const ban=document.getElementById('stagingBanner');
+  if(ban) ban.innerHTML = n ? `<div class="banner">📥 <span><b>${n}</b> imported line${n!==1?'s are':' is'} waiting on the <b>Import Statement</b> page.</span><button class="btn primary sm" onclick="goView('staging')">Go to Import Statement</button></div>` : '';
+}
+function stTypeFilterChanged(){ document.getElementById('stAlloc').value='All'; renderStaging(); }
+function stClearFilters(){ ['stSearch'].forEach(i=>document.getElementById(i).value=''); document.getElementById('stShow').value='all'; document.getElementById('stType').value='All'; document.getElementById('stAlloc').value='All'; renderStaging(); }
+function stFiltered(dups){
+  dups = dups || stDupInfo();
+  const q=(document.getElementById('stSearch').value||'').toLowerCase();
+  const sh=document.getElementById('stShow').value, ty=document.getElementById('stType').value, al=document.getElementById('stAlloc').value;
+  return stg().filter(r=>{
+    if(q && !((r.description||'').toLowerCase().includes(q)||(r.notes||'').toLowerCase().includes(q)||(r.allocation||'').toLowerCase().includes(q))) return false;
+    if(ty!=='All' && r.type!==ty) return false;
+    if(al==='__none' && (r.allocation||'').trim()) return false;
+    if(al!=='All' && al!=='__none' && r.allocation!==al) return false;
+    const d=dups[r.id]||{};
+    if(sh==='need' && (r.allocation||'').trim()) return false;
+    if(sh==='notyes' && r.ready) return false;
+    if(sh==='yes' && !r.ready) return false;
+    if(sh==='dup' && !(d.tx||d.rep)) return false;
+    return true;
+  });
+}
+function renderStaging(){
+  const all=stg(), dups=stDupInfo();
+  // allocation filter follows the chosen type
+  const ty=document.getElementById('stType').value, alEl=document.getElementById('stAlloc'), curAl=alEl.value||'All';
+  const als=stAllocsFor(ty);
+  alEl.innerHTML='<option value="All">All</option><option value="__none">— Unallocated —</option>'+als.map(a=>`<option>${esc(a)}</option>`).join('');
+  alEl.value = [...alEl.options].some(o=>o.value===curAl) ? curAl : 'All';
+
+  // summary cards
+  const need=all.filter(r=>!(r.allocation||'').trim()).length;
+  const yes=all.filter(r=>r.ready);
+  const inn=sum(yes.filter(r=>r.type==='Income').map(r=>r.amount)), out=sum(yes.filter(r=>r.type!=='Income').map(r=>r.amount));
+  const nd=all.filter(r=>dups[r.id].tx||dups[r.id].rep).length;
+  document.getElementById('stCards').innerHTML=`
+    <div class="st-card"><div class="lab">In review</div><div class="val num">${all.length}</div><div class="sub">lines waiting</div></div>
+    <div class="st-card warn"><div class="lab">Need allocation</div><div class="val num">${need}</div><div class="sub">outlined in red</div></div>
+    <div class="st-card ok"><div class="lab">Ticked Yes</div><div class="val num">${yes.length}</div><div class="sub">In ${fmt(inn)} · Out ${fmt(out)}</div></div>
+    <div class="st-card dup"><div class="lab">Possible duplicates</div><div class="val num">${nd}</div><div class="sub">check before moving</div></div>`;
+
+  const rows=stFiltered(dups).slice().sort((a,b)=>(a.date<b.date?1:a.date>b.date?-1:0));
+  const body=document.getElementById('stBody');
+  if(!all.length){
+    body.innerHTML=`<tr><td colspan="10"><div class="empty"><div class="big">📥</div><h3>Nothing to review</h3><div>Click <b>Import statement ▾</b> to bring in a CSV, Excel or PDF bank statement.</div></div></td></tr>`;
+  } else if(!rows.length){
+    body.innerHTML=`<tr><td colspan="10"><div class="empty"><h3>No lines match these filters</h3><div><button class="btn ghost sm" onclick="stClearFilters()">Clear filters</button></div></div></td></tr>`;
+  } else {
+    const accts=stAccounts(), pers=stPersons();
+    body.innerHTML=rows.map(r=>{
+      const d=dups[r.id], noAl=!(r.allocation||'').trim(), ok=stComplete(r);
+      const tags=(r.suggested?'<span class="st-tag sug">✨ Suggested</span>':'')+
+        (d.tx?'<span class="st-tag dup">⚠ Already in Transactions</span>':'')+(d.rep?'<span class="st-tag dup">⚠ Repeated in this review</span>':'');
+      return `<tr class="${noAl?'need-row':''}">
+        <td><input type="checkbox" class="stsel" data-id="${r.id}" onchange="stSelChanged()"></td>
+        <td><label class="st-yes" title="${ok?'Tick when this line is ready':'Needs a date, an amount above 0 and an allocation'}"><input type="checkbox" ${r.ready?'checked':''} ${ok?'':'disabled'} onchange="stSetReady('${r.id}',this.checked)">Yes</label></td>
+        <td><input class="st-in" type="date" value="${esc(r.date||'')}" onchange="stEdit('${r.id}','date',this.value)"></td>
+        <td><input class="st-in" value="${esc(r.description||'')}" onchange="stEdit('${r.id}','description',this.value)">${tags}</td>
+        <td><select class="st-in" onchange="stEdit('${r.id}','type',this.value)">${TYPES.map(t=>`<option${t===r.type?' selected':''}>${t}</option>`).join('')}</select></td>
+        <td><select class="st-in ${noAl?'need':''}" onchange="stAllocPicked('${r.id}',this)">${stOpts(stAllocsFor(r.type), r.allocation, '— choose —')}<option value="__new">＋ New allocation…</option></select></td>
+        <td><input class="st-in num" style="text-align:right" type="number" min="0" step="0.01" value="${(Number(r.amount)||0).toFixed(2)}" onchange="stEdit('${r.id}','amount',this.value)"></td>
+        <td><select class="st-in" onchange="stEdit('${r.id}','account',this.value)">${stOpts(accts, r.account)}</select></td>
+        <td><select class="st-in" onchange="stEdit('${r.id}','person',this.value)">${stOpts(pers, r.person)}</select></td>
+        <td><input class="st-in" value="${esc(r.notes||'')}" placeholder="—" onchange="stEdit('${r.id}','notes',this.value)"></td>
+      </tr>`;
+    }).join('');
+  }
+  document.getElementById('stCount').textContent = `${rows.length} of ${all.length} line${all.length!==1?'s':''} shown`;
+  document.getElementById('stMoveBtn').textContent = `➜ Move ticked to Transactions${yes.length?` (${yes.length})`:''}`;
+  document.getElementById('stSelAll').checked=false;
+  stSelChanged();
+}
+function stFind(id){ return stg().find(r=>r.id===id); }
+function stEdit(id, field, v){
+  const r=stFind(id); if(!r) return;
+  if(field==='amount') v=Math.round((Math.abs(Number(v))||0)*100)/100;
+  if(field==='account') v=maskAcct(v);
+  if(field==='description'||field==='notes') v=String(v).trim();
+  r[field]=v;
+  if(field==='type'){ r.suggested=false; if(r.allocation && !(state.lists.allocations[v]||[]).includes(r.allocation) && !stg().some(x=>x!==r&&x.type===v&&x.allocation===r.allocation)) r.allocation=''; }
+  if(r.ready && !stComplete(r)){ r.ready=false; toast('Unticked — this line is now missing a required field',true); }
+  save(); renderStaging(); updateStagingBadge();
+}
+function stAllocPicked(id, sel){
+  const r=stFind(id); if(!r) return;
+  let v=sel.value;
+  if(v==='__new'){ v=(prompt(`New ${r.type} allocation name:`)||'').trim(); if(!v){ renderStaging(); return; } }
+  r.suggested=false; stEdit(id,'allocation',v);
+}
+function stSetReady(id, on){
+  const r=stFind(id); if(!r) return;
+  if(on && !stComplete(r)){ toast('Add a date, an amount and an allocation first',true); renderStaging(); return; }
+  r.ready=!!on; save(); renderStaging();
+}
+function stSelIds(){ return [...document.querySelectorAll('.stsel:checked')].map(c=>c.dataset.id); }
+function stSelChanged(){ const n=stSelIds().length; document.querySelectorAll('.stsel-btn').forEach(b=>b.disabled=n===0); }
+function stSelectAll(on){ document.querySelectorAll('.stsel').forEach(c=>c.checked=on); stSelChanged(); }
+function stTickSelected(on){
+  const ids=stSelIds(); let n=0, skip=0;
+  stg().forEach(r=>{ if(ids.includes(r.id)){ if(on && !stComplete(r)){ skip++; return; } r.ready=on; n++; } });
+  save(); renderStaging();
+  toast(on ? `Ticked ${n} line(s)`+(skip?` · ${skip} skipped (incomplete)`:'') : `Unticked ${n} line(s)`, on&&skip>0&&n===0);
+}
+function stTickAllReady(){
+  const rows=stFiltered(); let n=0, skip=0;
+  rows.forEach(r=>{ if(stComplete(r)){ if(!r.ready){ r.ready=true; n++; } } else skip++; });
+  save(); renderStaging();
+  toast(`Ticked ${n} line(s) as ready`+(skip?` · ${skip} skipped (missing date, amount or allocation)`:''));
+}
+function stRemoveSelected(){
+  const ids=stSelIds(); if(!ids.length) return;
+  if(!confirm(`Remove ${ids.length} selected line(s) from Import Statement?`)) return;
+  state.staging=stg().filter(r=>!ids.includes(r.id)); save(); render(); toast(`Removed ${ids.length} line(s)`);
+}
+function stClearAll(){
+  if(!stg().length) return;
+  if(!confirm(`Clear all ${stg().length} line(s) from Import Statement? Nothing is added to Transactions.`)) return;
+  state.staging=[]; save(); render(); toast('Import Statement cleared');
+}
+function stMoveTicked(){
+  const dups=stDupInfo();
+  const ticked=stg().filter(r=>r.ready && stComplete(r));
+  if(!ticked.length){ toast('Nothing is ticked Yes yet',true); return; }
+  const nd=ticked.filter(r=>dups[r.id].tx||dups[r.id].rep).length;
+  if(nd && !confirm(`${nd} of the ticked line(s) look like duplicates. Move them anyway?`)) return;
+  let skippedLists=0;
+  ticked.forEach(r=>{
+    const L=state.lists.allocations[r.type]||(state.lists.allocations[r.type]=[]);
+    if(!L.some(a=>a.toLowerCase()===r.allocation.toLowerCase())) L.push(r.allocation);
+    if(r.account && !state.lists.accounts.some(a=>a.toLowerCase()===r.account.toLowerCase())){
+      if(state.lists.accounts.length<LIST_LIMITS.accounts) state.lists.accounts.push(r.account); else skippedLists++; }
+    if(r.person && !state.lists.persons.some(p=>p.toLowerCase()===r.person.toLowerCase())){
+      if(state.lists.persons.length<LIST_LIMITS.persons) state.lists.persons.push(r.person); else skippedLists++; }
+    state.transactions.push({ id:uid(), date:r.date, description:r.description, type:r.type, allocation:r.allocation,
+      amount:Math.abs(Number(r.amount))||0, account:r.account, person:r.person, notes:r.notes||'' });
+  });
+  const ids=new Set(ticked.map(r=>r.id));
+  state.staging=stg().filter(r=>!ids.has(r.id));
+  save(); render();
+  toast(`Moved ${ticked.length} line(s) to Transactions`+(skippedLists?' · Setup list limit reached for some accounts/people':''));
 }
 
 /* ---------- Column-matching dialog (map a bank layout once, save it) ---------- */
@@ -2042,9 +2320,11 @@ create policy "change own" on public.app_state for update using (auth.uid() = us
 function activeView(){ const b=document.querySelector('#nav button.active'); return b?b.dataset.view:'dashboard'; }
 function render(){
   refreshDropdowns();
+  updateStagingBadge();
   switch(activeView()){
     case 'dashboard': renderDashboard(); break;
     case 'transactions': renderTxns(); break;
+    case 'staging': renderStaging(); break;
     case 'budget': renderBudget(); break;
     case 'reports': renderReports(); break;
     case 'tax': renderTax(); break;
