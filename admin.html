@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>EZFin Admin</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230a2e63'/><text x='50' y='66' font-size='46' text-anchor='middle' fill='white' font-family='Arial' font-weight='700'>A</text></svg>">
+<style>
+:root{
+  --bg:#e7f2fa; --panel:#ffffff; --panel-2:#f2f8fc; --line:#cfe4f2;
+  --text:#0c2237; --muted:#4a6680;
+  --navy:#0a2e63; --brand:#175b9e; --brand-2:#1272b8; --chip:#e4f2fb;
+  --ok:#0f8f61; --ok-soft:#e2f4ec; --bad:#d83b41; --bad-soft:#fbe4e5; --warn:#b86a12; --warn-soft:#f8ead5;
+  --grey:#5b7690; --grey-soft:#e9eef3;
+  --shadow:0 1px 2px rgba(11,46,99,.08), 0 6px 18px rgba(11,46,99,.10);
+  --radius:12px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f2740; --panel:#173a5c; --panel-2:#12314f; --line:#2c5a85;
+    --text:#eaf3fd; --muted:#a9c3de; --navy:#0e3459; --brand:#7cbcef; --brand-2:#9ad2f2; --chip:#1b4874;
+    --ok:#2ed6a0; --ok-soft:#0f3a30; --bad:#ff787d; --bad-soft:#3a1a1d; --warn:#f0b45c; --warn-soft:#33260f;
+    --grey:#a9c3de; --grey-soft:#21476d; --shadow:0 1px 2px rgba(0,0,0,.35), 0 10px 26px rgba(0,0,0,.4);
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg); color:var(--text); font-family:"Segoe UI",Roboto,Helvetica,Arial,system-ui,sans-serif; font-size:14px; line-height:1.45}
+h1,h2,h3{margin:0; letter-spacing:-.01em}
+button{font-family:inherit; cursor:pointer}
+input,select,textarea{font-family:inherit; font-size:14px}
+.num{font-variant-numeric:tabular-nums}
+header{background:var(--navy); color:#fff; padding:14px 20px; display:flex; align-items:center; gap:14px; flex-wrap:wrap}
+header h1{font-size:18px}
+header .who{margin-left:auto; font-size:13px; opacity:.85}
+header .btn{background:rgba(255,255,255,.12); color:#fff; border-color:rgba(255,255,255,.25)}
+main{max-width:1280px; margin:0 auto; padding:20px 16px 60px}
+.btn{display:inline-flex; align-items:center; gap:6px; border:1px solid transparent; border-radius:9px; padding:8px 14px; font-weight:600; font-size:13.5px; background:var(--brand); color:#fff}
+.btn:hover{filter:brightness(1.08)}
+.btn.ghost{background:var(--panel-2); color:var(--text); border-color:var(--line)}
+.btn.danger{background:var(--bad-soft); color:var(--bad)}
+.btn.sm{padding:5px 10px; font-size:12.5px}
+.btn:disabled{opacity:.5; cursor:not-allowed}
+.field{background:var(--panel-2); border:1px solid var(--line); border-radius:9px; padding:8px 10px; color:var(--text); width:100%}
+.field:focus{outline:none; border-color:var(--brand-2)}
+label{display:block; font-size:11px; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); font-weight:700; margin-bottom:4px}
+.cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:18px}
+.card{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow)}
+.kpi{padding:14px 16px; cursor:pointer}
+.kpi .lab{font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); font-weight:700}
+.kpi .val{font-size:24px; font-weight:800; margin-top:4px}
+.kpi.sel{outline:2px solid var(--brand-2)}
+.toolbar{display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; padding:14px 16px; margin-bottom:14px}
+.toolbar .fx{min-width:160px}
+.toolbar .grow{flex:1}
+.table-wrap{overflow:auto}
+table{width:100%; border-collapse:collapse}
+th{font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); text-align:left; padding:10px 12px; border-bottom:1px solid var(--line); background:var(--panel-2); white-space:nowrap}
+td{padding:10px 12px; border-bottom:1px solid var(--line); vertical-align:top}
+tbody tr.click{cursor:pointer}
+tbody tr.click:hover{background:var(--panel-2)}
+.r{text-align:right}
+.tiny{font-size:12px; color:var(--muted)}
+.pill{display:inline-block; padding:2px 9px; border-radius:999px; font-size:11.5px; font-weight:700; white-space:nowrap}
+.pill.Active,.pill.Paid,.pill.OK{background:var(--ok-soft); color:var(--ok)}
+.pill.Pending{background:var(--warn-soft); color:var(--warn)}
+.pill.Suspended,.pill.Failed,.pill.bad{background:var(--bad-soft); color:var(--bad)}
+.pill.Cancelled,.pill.Refunded,.pill.Disabled{background:var(--grey-soft); color:var(--grey)}
+.pill.warn{background:var(--warn-soft); color:var(--warn)}
+.empty{text-align:center; padding:40px 16px; color:var(--muted)}
+/* modal */
+.modal-bg{position:fixed; inset:0; background:rgba(6,20,40,.55); display:none; align-items:flex-start; justify-content:center; z-index:50; padding:30px 12px; overflow:auto}
+.modal-bg.show{display:flex}
+.modal{background:var(--panel); border-radius:14px; width:100%; max-width:860px; box-shadow:var(--shadow)}
+.modal-h{display:flex; align-items:center; gap:10px; padding:16px 18px; border-bottom:1px solid var(--line)}
+.modal-h .x{margin-left:auto; background:none; border:none; font-size:22px; color:var(--muted)}
+.modal-b{padding:16px 18px}
+.tabs{display:flex; gap:4px; padding:0 18px; border-bottom:1px solid var(--line); overflow-x:auto}
+.tabs button{background:none; border:none; border-bottom:3px solid transparent; padding:10px 12px; font-weight:700; color:var(--muted); white-space:nowrap}
+.tabs button.on{color:var(--brand); border-bottom-color:var(--brand-2)}
+.grid{display:grid; grid-template-columns:repeat(3,1fr); gap:12px}
+.grid .span2{grid-column:span 2} .grid .span3{grid-column:span 3}
+@media(max-width:720px){.grid{grid-template-columns:1fr} .grid .span2,.grid .span3{grid-column:auto}}
+.row-actions{display:flex; gap:8px; justify-content:flex-end; margin-top:14px; flex-wrap:wrap}
+.sub{background:var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:12px; margin-top:14px}
+.msg{min-height:18px; font-size:13px; font-weight:600; margin-top:8px}
+.msg.err{color:var(--bad)} .msg.ok{color:var(--ok)}
+/* login */
+.gate{min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px}
+.gate .card{width:100%; max-width:380px; padding:26px}
+.gate h2{margin-bottom:4px}
+#toast{position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(80px); background:var(--navy); color:#fff; padding:10px 18px; border-radius:10px; font-weight:600; transition:.25s; z-index:90; max-width:90vw}
+#toast.show{transform:translateX(-50%) translateY(0)}
+#toast.err{background:var(--bad)}
+.hide{display:none !important}
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div class="gate" id="gate">
+  <div class="card">
+    <h2>EZFin Admin</h2>
+    <p class="tiny" style="margin:0 0 16px">Client management. Admin accounts only.</p>
+    <div style="margin-bottom:10px"><label>Email</label><input class="field" id="gEmail" type="email" autocomplete="username"></div>
+    <div style="margin-bottom:6px"><label>Password</label><input class="field" id="gPass" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()"></div>
+    <div class="msg" id="gMsg"></div>
+    <button class="btn" style="width:100%; justify-content:center; margin-top:6px" onclick="login()">Log in</button>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app" class="hide">
+  <header>
+    <h1>EZFin · Client Management</h1>
+    <span class="who" id="who"></span>
+    <button class="btn sm" onclick="logout()">Log out</button>
+  </header>
+  <main>
+    <div class="cards" id="kpis"></div>
+
+    <div class="card toolbar">
+      <div class="fx grow"><label>Search</label><input class="field" id="q" placeholder="Name, email, client no, mobile…" oninput="renderList()"></div>
+      <div class="fx"><label>Status</label><select class="field" id="fStatus" onchange="renderList()">
+        <option value="">All</option><option>Pending</option><option>Active</option><option>Suspended</option><option>Cancelled</option>
+        <option value="due">Due in 7 days</option><option value="grace">In grace / overdue</option></select></div>
+      <div class="fx"><label>Billing</label><select class="field" id="fCycle" onchange="renderList()"><option value="">All</option><option>Monthly</option><option>Annual</option></select></div>
+      <button class="btn ghost" onclick="loadAll()">⟳ Refresh</button>
+      <button class="btn ghost" onclick="exportCsv()">⬇ Export CSV</button>
+      <button class="btn" onclick="openNew()">＋ New client</button>
+    </div>
+
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Client</th><th>Name</th><th>Email / Mobile</th><th>Status</th><th>Billing</th><th>Logins</th><th>Created</th><th>Expiry</th><th>Last login</th></tr></thead>
+          <tbody id="list"></tbody>
+        </table>
+      </div>
+    </div>
+    <p class="tiny" style="margin-top:10px">Rules: max 3 logins per client · access ends 10 days after the expiry date (grace) · overdue Active clients are suspended automatically every night · a <b>Paid</b> payment extends the expiry and re-activates Pending/Suspended clients.</p>
+  </main>
+</div>
+
+<!-- ============ CLIENT MODAL ============ -->
+<div class="modal-bg" id="cm">
+  <div class="modal">
+    <div class="modal-h"><h3 id="cmTitle">Client</h3><span id="cmPill"></span><button class="x" onclick="closeModal()">×</button></div>
+    <div class="tabs" id="cmTabs">
+      <button data-t="details" class="on">Details</button>
+      <button data-t="logins">Logins</button>
+      <button data-t="payments">Payments</button>
+      <button data-t="history">History</button>
+    </div>
+    <div class="modal-b">
+      <!-- Details -->
+      <div id="t-details">
+        <div class="grid">
+          <div><label>First name</label><input class="field" id="d_first_name"></div>
+          <div><label>Last name</label><input class="field" id="d_last_name"></div>
+          <div><label>Email *</label><input class="field" id="d_email" type="email"></div>
+          <div><label>Mobile</label><input class="field" id="d_mobile"></div>
+          <div><label>Province</label><select class="field" id="d_province"><option value=""></option><option>Eastern Cape</option><option>Free State</option><option>Gauteng</option><option>KwaZulu-Natal</option><option>Limpopo</option><option>Mpumalanga</option><option>North West</option><option>Northern Cape</option><option>Western Cape</option><option>Outside SA</option></select></div>
+          <div><label>Country</label><input class="field" id="d_country" value="ZA"></div>
+
+          <div><label>Status</label><select class="field" id="d_status"><option>Pending</option><option>Active</option><option>Suspended</option><option>Cancelled</option></select></div>
+          <div class="span2"><label>Reason for status (required when you change it)</label><input class="field" id="d_status_reason"></div>
+
+          <div><label>Payment period</label><select class="field" id="d_billing_cycle" onchange="cycleChanged()"><option>Monthly</option><option>Annual</option></select></div>
+          <div><label>Price (R)</label><input class="field num" id="d_price" type="number" min="0" step="0.01"></div>
+          <div><label>Max logins (1–3)</label><select class="field" id="d_max_logins"><option>1</option><option>2</option><option>3</option></select></div>
+
+          <div><label>Expiry date (paid up to)</label><input class="field" id="d_expiry_date" type="date"></div>
+          <div><label>Next billing date</label><input class="field" id="d_next_billing_date" type="date"></div>
+          <div><label>Referral source</label><input class="field" id="d_referral_source" placeholder="Facebook, friend…"></div>
+
+          <div><label>POPIA consent</label><select class="field" id="d_popia"><option value="">Not recorded</option><option value="yes">Consent given</option></select></div>
+          <div><label>Marketing emails</label><select class="field" id="d_marketing_opt_in"><option value="false">No</option><option value="true">Yes</option></select></div>
+          <div><label>Payment gateway ref</label><input class="field" id="d_payment_gateway_ref" placeholder="PayFast / Yoco token"></div>
+
+          <div class="span3"><label>Admin notes (private)</label><textarea class="field" id="d_admin_notes" rows="3"></textarea></div>
+        </div>
+        <p class="tiny" id="d_meta" style="margin-top:10px"></p>
+        <div class="row-actions">
+          <button class="btn danger" id="delBtn" onclick="deleteClient()">Delete client</button>
+          <span style="flex:1"></span>
+          <button class="btn ghost" onclick="closeModal()">Close</button>
+          <button class="btn" onclick="saveDetails()">Save details</button>
+        </div>
+        <div class="msg" id="dMsg"></div>
+      </div>
+
+      <!-- Logins -->
+      <div id="t-logins" class="hide">
+        <p class="tiny" style="margin-top:0">People who may log in to this client's shared data. The person signs up in the app with this exact email and is linked automatically.</p>
+        <div class="table-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Signed up</th><th>Last login</th><th></th></tr></thead><tbody id="lBody"></tbody></table></div>
+        <div class="sub">
+          <h3 style="font-size:14px; margin-bottom:10px">Add a login</h3>
+          <div class="grid">
+            <div><label>Full name</label><input class="field" id="l_name"></div>
+            <div><label>Email *</label><input class="field" id="l_email" type="email"></div>
+            <div><label>Role</label><select class="field" id="l_role"><option>Member</option><option>Owner</option></select></div>
+          </div>
+          <div class="row-actions"><button class="btn" onclick="addLogin()">Add login</button></div>
+          <div class="msg" id="lMsg"></div>
+        </div>
+      </div>
+
+      <!-- Payments -->
+      <div id="t-payments" class="hide">
+        <div class="table-wrap"><table><thead><tr><th>Date</th><th>Invoice</th><th class="r">Amount</th><th>Period</th><th>Method</th><th>Reference</th><th>Status</th><th></th></tr></thead><tbody id="pBody"></tbody></table></div>
+        <div class="sub">
+          <h3 style="font-size:14px; margin-bottom:10px">Record a payment</h3>
+          <div class="grid">
+            <div><label>Payment date</label><input class="field" id="p_date" type="date"></div>
+            <div><label>Amount (R)</label><input class="field num" id="p_amount" type="number" min="0" step="0.01"></div>
+            <div><label>Method</label><select class="field" id="p_method"><option>EFT</option><option>Card</option><option>Debit order</option><option>Cash</option><option>Other</option></select></div>
+            <div><label>Status</label><select class="field" id="p_status"><option>Paid</option><option>Pending</option><option>Failed</option></select></div>
+            <div><label>Reference</label><input class="field" id="p_ref" placeholder="Bank / gateway reference"></div>
+            <div><label>Notes</label><input class="field" id="p_notes"></div>
+          </div>
+          <p class="tiny">The period is filled in automatically (from the day after the current expiry, 1 month or 1 year). A <b>Paid</b> payment moves the expiry date forward and re-activates the client.</p>
+          <div class="row-actions"><button class="btn" onclick="addPayment()">Record payment</button></div>
+          <div class="msg" id="pMsg"></div>
+        </div>
+      </div>
+
+      <!-- History -->
+      <div id="t-history" class="hide">
+        <h3 style="font-size:14px; margin-bottom:8px">Status changes</h3>
+        <div class="table-wrap"><table><thead><tr><th>When</th><th>From</th><th>To</th><th>Reason</th><th>By</th></tr></thead><tbody id="hBody"></tbody></table></div>
+        <h3 style="font-size:14px; margin:18px 0 8px">Recent login attempts</h3>
+        <div class="table-wrap"><table><thead><tr><th>When</th><th>Email</th><th>Result</th><th>Device</th></tr></thead><tbody id="llBody"></tbody></table></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ NEW CLIENT MODAL ============ -->
+<div class="modal-bg" id="nm">
+  <div class="modal" style="max-width:620px">
+    <div class="modal-h"><h3>New client</h3><button class="x" onclick="document.getElementById('nm').classList.remove('show')">×</button></div>
+    <div class="modal-b">
+      <div class="grid">
+        <div><label>First name</label><input class="field" id="n_first"></div>
+        <div><label>Last name</label><input class="field" id="n_last"></div>
+        <div><label>Mobile</label><input class="field" id="n_mobile"></div>
+        <div class="span2"><label>Email * (this person's login)</label><input class="field" id="n_email" type="email"></div>
+        <div><label>Status</label><select class="field" id="n_status"><option>Pending</option><option>Active</option></select></div>
+        <div><label>Payment period</label><select class="field" id="n_cycle" onchange="document.getElementById('n_price').value=this.value==='Annual'?600:50"><option>Monthly</option><option>Annual</option></select></div>
+        <div><label>Price (R)</label><input class="field num" id="n_price" type="number" value="50"></div>
+        <div><label>Referral source</label><input class="field" id="n_ref"></div>
+      </div>
+      <p class="tiny">The client then signs up in the app with this email and is linked automatically. Record their first payment to activate them.</p>
+      <div class="row-actions"><button class="btn ghost" onclick="document.getElementById('nm').classList.remove('show')">Cancel</button><button class="btn" onclick="createClient()">Create client</button></div>
+      <div class="msg" id="nMsg"></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ===== connection (same Supabase project as the app — public anon key; security is enforced by the database) ===== */
+const SUPA_URL='https://rkfmeseqfiyqroijgopn.supabase.co';
+const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJrZm1lc2VxZml5cXJvaWpnb3BuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxNjgxODcsImV4cCI6MjEwMzc0NDE4N30.kSIhxL-EManT7293R46jqqNPCDdR_W89tw4zgKEwSPE';
+const SKEY='ezfin_admin_session_v1';
+const GRACE_DAYS=10;
+let session=null, clients=[], cur=null, kpiFilter='';
+
+/* ===== helpers ===== */
+const $=id=>document.getElementById(id);
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function toast(m,err){ const t=$('toast'); t.textContent=m; t.className='show'+(err?' err':''); clearTimeout(t._h); t._h=setTimeout(()=>t.className='',2600); }
+function msg(id,t,ok){ const m=$(id); m.textContent=t||''; m.className='msg'+(t?(ok?' ok':' err'):''); }
+function money(n){ return 'R '+(Number(n)||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,' '); }
+function d10(s){ return s?String(s).slice(0,10):''; }
+function fmtD(s){ if(!s) return '—'; const d=new Date(String(s).length<=10?s+'T00:00:00':s); return isNaN(d)?s:d.toLocaleDateString('en-ZA',{day:'2-digit',month:'short',year:'numeric'}); }
+function fmtDT(s){ if(!s) return '—'; const d=new Date(s); return d.toLocaleString('en-ZA',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+function today(){ const d=new Date(); d.setHours(0,0,0,0); return d; }
+function addDays(s,n){ const d=new Date(s+'T00:00:00'); d.setDate(d.getDate()+n); return d; }
+function iso(d){ return new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10); }
+function fullName(c){ return [c.first_name,c.last_name].filter(Boolean).join(' '); }
+
+/* ===== Supabase REST ===== */
+function saveSess(s){ session=s; if(s) localStorage.setItem(SKEY,JSON.stringify(s)); else localStorage.removeItem(SKEY); }
+async function authCall(path,body){
+  const r=await fetch(SUPA_URL+'/auth/v1/'+path,{method:'POST',headers:{apikey:SUPA_KEY,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok||!d.access_token) throw new Error(d.error_description||d.msg||d.message||'Login failed');
+  return {access_token:d.access_token, refresh_token:d.refresh_token, user:{id:d.user.id,email:d.user.email}};
+}
+async function api(path,opts={}){
+  const go=()=>fetch(SUPA_URL+'/rest/v1/'+path,{...opts,headers:{apikey:SUPA_KEY,Authorization:'Bearer '+(session&&session.access_token),'Content-Type':'application/json',...(opts.headers||{})}});
+  let r=await go();
+  if(r.status===401 && session && session.refresh_token){
+    try{ saveSess(await authCall('token?grant_type=refresh_token',{refresh_token:session.refresh_token})); r=await go(); }
+    catch(e){ logout(); throw new Error('Your session expired — please log in again.'); }
+  }
+  const txt=await r.text(); let d=null; try{ d=txt?JSON.parse(txt):null; }catch(e){ d=txt; }
+  if(!r.ok) throw new Error((d&&(d.message||d.hint||d.details))||('Error '+r.status));
+  return d;
+}
+const REP={Prefer:'return=representation'};
+
+/* ===== login ===== */
+async function login(){
+  const email=$('gEmail').value.trim(), pass=$('gPass').value;
+  if(!email||!pass){ msg('gMsg','Enter your email and password.'); return; }
+  msg('gMsg','Logging in…',true);
+  try{ saveSess(await authCall('token?grant_type=password',{email,password:pass})); await start(); }
+  catch(e){ msg('gMsg',/invalid/i.test(e.message)?'Email or password is wrong.':e.message); }
+}
+async function start(){
+  let ok=false;
+  try{ const a=await api('admins?select=user_id&user_id=eq.'+session.user.id); ok=a&&a.length>0; }catch(e){ msg('gMsg',e.message); }
+  if(!ok){ saveSess(null); msg('gMsg','This account is not an admin.'); return; }
+  $('gate').classList.add('hide'); $('app').classList.remove('hide');
+  $('who').textContent=session.user.email;
+  await loadAll();
+}
+function logout(){ saveSess(null); $('app').classList.add('hide'); $('gate').classList.remove('hide'); $('gPass').value=''; msg('gMsg',''); }
+
+/* ===== list ===== */
+async function loadAll(){
+  try{
+    clients=await api('clients?select=*,client_logins(id,status,last_login_at)&order=created_at.desc');
+    renderKpis(); renderList();
+  }catch(e){ toast(e.message,true); }
+}
+function expiryState(c){
+  if(!c.expiry_date) return {k:'none'};
+  const t=today(), exp=new Date(c.expiry_date+'T00:00:00'), grace=addDays(c.expiry_date,GRACE_DAYS);
+  if(t>grace) return {k:'expired', label:'Expired'};
+  if(t>exp)   return {k:'grace', label:'In grace until '+fmtD(iso(grace))};
+  if((exp-t)/864e5<=7) return {k:'due', label:'Due soon'};
+  return {k:'ok'};
+}
+function lastLogin(c){ const l=(c.client_logins||[]).map(x=>x.last_login_at).filter(Boolean).sort(); return l.length?l[l.length-1]:null; }
+function activeLogins(c){ return (c.client_logins||[]).filter(x=>x.status==='Active').length; }
+function renderKpis(){
+  const n=s=>clients.filter(c=>c.status===s).length;
+  const act=clients.filter(c=>c.status==='Active');
+  const mrr=act.reduce((s,c)=>s+(c.billing_cycle==='Annual'?Number(c.price)/12:Number(c.price)),0);
+  const due=clients.filter(c=>c.status==='Active'&&expiryState(c).k==='due').length;
+  const gr=clients.filter(c=>['Active','Cancelled'].includes(c.status)&&['grace','expired'].includes(expiryState(c).k)).length;
+  const k=[['','All clients',clients.length],['Active','Active',n('Active')],['Pending','Pending',n('Pending')],['Suspended','Suspended',n('Suspended')],
+           ['Cancelled','Cancelled',n('Cancelled')],['due','Due in 7 days',due],['grace','In grace / overdue',gr],['mrr','Monthly revenue',money(mrr)]];
+  $('kpis').innerHTML=k.map(([f,l,v])=>`<div class="card kpi ${kpiFilter===f&&f!=='mrr'?'sel':''}" onclick="${f==='mrr'?'':`setKpi('${f}')`}"><div class="lab">${l}</div><div class="val num">${v}</div></div>`).join('');
+}
+function setKpi(f){ kpiFilter=f; $('fStatus').value=f; renderKpis(); renderList(); }
+function filtered(){
+  const q=$('q').value.toLowerCase().trim(), st=$('fStatus').value, cy=$('fCycle').value;
+  return clients.filter(c=>{
+    if(q && ![c.client_no,c.first_name,c.last_name,c.email,c.mobile].join(' ').toLowerCase().includes(q)) return false;
+    if(cy && c.billing_cycle!==cy) return false;
+    if(st==='due') return c.status==='Active' && expiryState(c).k==='due';
+    if(st==='grace') return ['Active','Cancelled'].includes(c.status) && ['grace','expired'].includes(expiryState(c).k);
+    if(st && c.status!==st) return false;
+    return true;
+  });
+}
+function renderList(){
+  kpiFilter=$('fStatus').value; renderKpis();
+  const rows=filtered();
+  if(!rows.length){ $('list').innerHTML=`<tr><td colspan="9"><div class="empty">No clients match.</div></td></tr>`; return; }
+  $('list').innerHTML=rows.map(c=>{
+    const ex=expiryState(c);
+    const exTag = ex.k==='expired'?`<br><span class="pill bad">Expired</span>` : ex.k==='grace'?`<br><span class="pill warn">${esc(ex.label)}</span>` : ex.k==='due'?`<br><span class="pill warn">Due soon</span>`:'';
+    return `<tr class="click" onclick="openClient('${c.id}')">
+      <td class="num"><b>${esc(c.client_no)}</b></td>
+      <td>${esc(fullName(c))||'<span class="tiny">—</span>'}</td>
+      <td>${esc(c.email)}<div class="tiny">${esc(c.mobile||'')}</div></td>
+      <td><span class="pill ${c.status}">${c.status}</span></td>
+      <td>${c.billing_cycle}<div class="tiny num">${money(c.price)}</div></td>
+      <td class="num">${activeLogins(c)} / ${c.max_logins}</td>
+      <td class="num">${fmtD(d10(c.created_at))}</td>
+      <td class="num">${fmtD(c.expiry_date)}${exTag}</td>
+      <td class="num">${fmtDT(lastLogin(c))}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ===== client modal ===== */
+document.querySelectorAll('#cmTabs button').forEach(b=>b.onclick=()=>showTab(b.dataset.t));
+function showTab(t){
+  document.querySelectorAll('#cmTabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+  ['details','logins','payments','history'].forEach(x=>$('t-'+x).classList.toggle('hide',x!==t));
+  if(t==='logins') loadLogins(); if(t==='payments') loadPayments(); if(t==='history') loadHistory();
+}
+function closeModal(){ $('cm').classList.remove('show'); cur=null; }
+const DF=['first_name','last_name','email','mobile','province','country','status','billing_cycle','price','max_logins','expiry_date','next_billing_date','referral_source','payment_gateway_ref','admin_notes'];
+function fillDetails(c){
+  DF.forEach(f=>{ $('d_'+f).value = c[f]==null?'':(f.endsWith('_date')?d10(c[f]):c[f]); });
+  $('d_status_reason').value=''; $('d_status_reason').placeholder=c.status_reason||'';
+  $('d_marketing_opt_in').value=String(!!c.marketing_opt_in);
+  $('d_popia').value=c.popia_consent_at?'yes':'';
+  $('cmTitle').textContent=c.client_no+' · '+(fullName(c)||c.email);
+  $('cmPill').innerHTML=`<span class="pill ${c.status}">${c.status}</span>`;
+  $('d_meta').innerHTML=`Created ${fmtDT(c.created_at)} · Activated ${fmtDT(c.activated_at)}`+
+    (c.suspended_at?` · Suspended ${fmtDT(c.suspended_at)}`:'')+(c.cancelled_at?` · Cancelled ${fmtDT(c.cancelled_at)}`:'')+
+    (c.popia_consent_at?` · POPIA consent ${fmtD(d10(c.popia_consent_at))}`:'')+(c.status_reason?`<br>Last status reason: <b>${esc(c.status_reason)}</b>`:'');
+  msg('dMsg','');
+}
+async function openClient(id){
+  try{
+    const r=await api('clients?select=*&id=eq.'+id); cur=r[0]; if(!cur) return;
+    fillDetails(cur); showTab('details'); $('cm').classList.add('show');
+  }catch(e){ toast(e.message,true); }
+}
+function cycleChanged(){
+  const p=$('d_price'), v=$('d_billing_cycle').value;
+  if(v==='Annual' && Number(p.value)===50) p.value=600;
+  if(v==='Monthly' && Number(p.value)===600) p.value=50;
+}
+async function saveDetails(){
+  if(!cur) return;
+  const b={};
+  DF.forEach(f=>{ let v=$('d_'+f).value.trim(); if(v==='') v=null;
+    if(f==='price') v=v==null?0:Number(v); if(f==='max_logins') v=Number(v); b[f]=v; });
+  b.marketing_opt_in=$('d_marketing_opt_in').value==='true';
+  b.popia_consent_at = $('d_popia').value==='yes' ? (cur.popia_consent_at||new Date().toISOString()) : null;
+  if(!b.email){ msg('dMsg','Email is required.'); return; }
+  if(b.status!==cur.status){
+    const reason=$('d_status_reason').value.trim();
+    if(!reason){ msg('dMsg','Please give a reason for changing the status.'); $('d_status_reason').focus(); return; }
+    b.status_reason=reason;
+  }
+  try{
+    const r=await api('clients?id=eq.'+cur.id,{method:'PATCH',headers:REP,body:JSON.stringify(b)});
+    cur=r[0]; fillDetails(cur); msg('dMsg','Saved ✓',true); loadAll();
+  }catch(e){ msg('dMsg',e.message); }
+}
+async function deleteClient(){
+  if(!cur) return;
+  const typed=prompt(`This permanently deletes ${cur.client_no} with ALL their logins, payments and their app data.\n\nTo confirm, type the client number (${cur.client_no}):`);
+  if(typed===null) return;
+  if(typed.trim().toUpperCase()!==cur.client_no){ toast('Client number did not match — nothing deleted',true); return; }
+  try{ await api('clients?id=eq.'+cur.id,{method:'DELETE'}); toast('Client deleted'); closeModal(); loadAll(); }
+  catch(e){ msg('dMsg',e.message); }
+}
+
+/* logins */
+async function loadLogins(){
+  try{
+    const r=await api('client_logins?select=*&client_id=eq.'+cur.id+'&order=added_at');
+    const act=r.filter(x=>x.status==='Active').length;
+    $('lBody').innerHTML = r.length ? r.map(l=>`<tr>
+      <td>${esc(l.full_name||'—')}</td><td>${esc(l.email)}</td><td>${l.role}</td>
+      <td><span class="pill ${l.status}">${l.status}</span></td>
+      <td>${l.user_id?'Yes':'<span class="tiny">Not yet</span>'}</td>
+      <td class="num">${fmtDT(l.last_login_at)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn ghost sm" onclick="toggleLogin('${l.id}','${l.status==='Active'?'Disabled':'Active'}')">${l.status==='Active'?'Disable':'Enable'}</button>
+        <button class="btn danger sm" onclick="removeLogin('${l.id}','${esc(l.email)}')">Remove</button></td>
+    </tr>`).join('') : `<tr><td colspan="7"><div class="empty">No logins yet.</div></td></tr>`;
+    msg('lMsg', act>=cur.max_logins ? `This client is at the maximum of ${cur.max_logins} active login(s).` : `${act} of ${cur.max_logins} logins used.`, act<cur.max_logins);
+  }catch(e){ msg('lMsg',e.message); }
+}
+async function addLogin(){
+  const email=$('l_email').value.trim(), name=$('l_name').value.trim();
+  if(!email){ msg('lMsg','Enter an email address.'); return; }
+  try{
+    await api('client_logins',{method:'POST',headers:REP,body:JSON.stringify({client_id:cur.id,email,full_name:name||null,role:$('l_role').value})});
+    $('l_email').value=''; $('l_name').value=''; await loadLogins(); loadAll(); toast('Login added');
+  }catch(e){ msg('lMsg', /duplicate|unique/i.test(e.message)?'That email is already a login on a client.':e.message); }
+}
+async function toggleLogin(id,st){
+  try{ await api('client_logins?id=eq.'+id,{method:'PATCH',body:JSON.stringify({status:st})}); await loadLogins(); loadAll(); }
+  catch(e){ msg('lMsg',e.message); }
+}
+async function removeLogin(id,email){
+  if(!confirm(`Remove ${email} from this client? They will no longer be able to log in to this data.`)) return;
+  try{ await api('client_logins?id=eq.'+id,{method:'DELETE'}); await loadLogins(); loadAll(); toast('Login removed'); }
+  catch(e){ msg('lMsg',e.message); }
+}
+
+/* payments */
+async function loadPayments(){
+  $('p_date').value=iso(today()); $('p_amount').value=Number(cur.price).toFixed(2); $('p_ref').value=''; $('p_notes').value=''; $('p_status').value='Paid'; msg('pMsg','');
+  try{
+    const r=await api('client_payments?select=*&client_id=eq.'+cur.id+'&order=payment_date.desc,created_at.desc');
+    const tot=r.filter(p=>p.status==='Paid').reduce((s,p)=>s+Number(p.amount),0);
+    $('pBody').innerHTML = r.length ? r.map(p=>`<tr>
+      <td class="num">${fmtD(p.payment_date)}</td><td class="num">${esc(p.invoice_no)}</td>
+      <td class="r num">${money(p.amount)}</td>
+      <td class="num">${p.period_start?fmtD(p.period_start)+' – '+fmtD(p.period_end):'—'}</td>
+      <td>${esc(p.method)}</td><td>${esc(p.gateway_ref||'')}<div class="tiny">${esc(p.notes||'')}</div></td>
+      <td><span class="pill ${p.status}">${p.status}</span></td>
+      <td>${p.status==='Paid'?`<button class="btn ghost sm" onclick="refund('${p.id}')">Mark refunded</button>`:''}</td>
+    </tr>`).join('') + `<tr><td colspan="2"><b>Total paid</b></td><td class="r num"><b>${money(tot)}</b></td><td colspan="5"></td></tr>`
+      : `<tr><td colspan="8"><div class="empty">No payments yet.</div></td></tr>`;
+  }catch(e){ msg('pMsg',e.message); }
+}
+async function addPayment(){
+  const amt=Number($('p_amount').value);
+  if(!(amt>0)){ msg('pMsg','Enter the amount paid.'); return; }
+  const b={client_id:cur.id, payment_date:$('p_date').value||iso(today()), amount:amt, method:$('p_method').value,
+           status:$('p_status').value, gateway_ref:$('p_ref').value.trim()||null, notes:$('p_notes').value.trim()||null};
+  try{
+    await api('client_payments',{method:'POST',headers:REP,body:JSON.stringify(b)});
+    const r=await api('clients?select=*&id=eq.'+cur.id); cur=r[0]; fillDetails(cur);
+    await loadPayments(); loadAll();
+    msg('pMsg', b.status==='Paid' ? `Payment recorded ✓ — paid up to ${fmtD(cur.expiry_date)}, status ${cur.status}.` : 'Payment recorded ✓', true);
+  }catch(e){ msg('pMsg', /duplicate|unique/i.test(e.message)?'That reference has already been recorded.':e.message); }
+}
+async function refund(id){
+  if(!confirm('Mark this payment as refunded? The expiry date is NOT changed automatically — adjust it on the Details tab if needed.')) return;
+  try{ await api('client_payments?id=eq.'+id,{method:'PATCH',body:JSON.stringify({status:'Refunded'})}); await loadPayments(); }
+  catch(e){ msg('pMsg',e.message); }
+}
+
+/* history */
+async function loadHistory(){
+  try{
+    const [h,l]=await Promise.all([
+      api('client_status_history?select=*&client_id=eq.'+cur.id+'&order=changed_at.desc'),
+      api('login_log?select=*&client_id=eq.'+cur.id+'&order=logged_at.desc&limit=30')]);
+    $('hBody').innerHTML = h.length ? h.map(x=>`<tr><td class="num">${fmtDT(x.changed_at)}</td><td>${x.old_status?`<span class="pill ${x.old_status}">${x.old_status}</span>`:'—'}</td>
+      <td><span class="pill ${x.new_status}">${x.new_status}</span></td><td>${esc(x.reason||'')}</td><td class="tiny">${x.changed_by?(x.changed_by===session.user.id?'You':'Admin'):'System'}</td></tr>`).join('')
+      : `<tr><td colspan="5"><div class="empty">No changes yet.</div></td></tr>`;
+    $('llBody').innerHTML = l.length ? l.map(x=>`<tr><td class="num">${fmtDT(x.logged_at)}</td><td>${esc(x.email||'')}</td>
+      <td><span class="pill ${x.result==='OK'?'OK':'bad'}">${esc(x.result)}</span></td><td class="tiny">${esc(device(x.user_agent))}</td></tr>`).join('')
+      : `<tr><td colspan="4"><div class="empty">No login attempts yet.</div></td></tr>`;
+  }catch(e){ toast(e.message,true); }
+}
+function device(ua){ ua=ua||''; const os=/Windows/.test(ua)?'Windows':/Android/.test(ua)?'Android':/iPhone|iPad/.test(ua)?'iOS':/Mac OS/.test(ua)?'Mac':/Linux/.test(ua)?'Linux':'';
+  const br=/Edg\//.test(ua)?'Edge':/Chrome\//.test(ua)?'Chrome':/Firefox\//.test(ua)?'Firefox':/Safari\//.test(ua)?'Safari':''; return [br,os].filter(Boolean).join(' · ')||ua.slice(0,40); }
+
+/* new client */
+function openNew(){ ['n_first','n_last','n_mobile','n_email','n_ref'].forEach(i=>$(i).value=''); $('n_status').value='Pending'; $('n_cycle').value='Monthly'; $('n_price').value=50; msg('nMsg',''); $('nm').classList.add('show'); }
+async function createClient(){
+  const email=$('n_email').value.trim();
+  if(!email){ msg('nMsg','Email is required.'); return; }
+  const b={first_name:$('n_first').value.trim()||null,last_name:$('n_last').value.trim()||null,mobile:$('n_mobile').value.trim()||null,email,
+           status:$('n_status').value,billing_cycle:$('n_cycle').value,price:Number($('n_price').value)||0,
+           referral_source:$('n_ref').value.trim()||null,status_reason:'Created by admin'};
+  let c=null;
+  try{
+    c=(await api('clients',{method:'POST',headers:REP,body:JSON.stringify(b)}))[0];
+    await api('client_logins',{method:'POST',body:JSON.stringify({client_id:c.id,email,full_name:[b.first_name,b.last_name].filter(Boolean).join(' ')||null,role:'Owner'})});
+    $('nm').classList.remove('show'); toast('Client '+c.client_no+' created'); await loadAll(); openClient(c.id);
+  }catch(e){
+    if(c){ try{ await api('clients?id=eq.'+c.id,{method:'DELETE'}); }catch(_){} }
+    msg('nMsg', /duplicate|unique/i.test(e.message)?'That email already belongs to a client login.':e.message);
+  }
+}
+
+/* export */
+function exportCsv(){
+  const rows=filtered(), cols=['client_no','first_name','last_name','email','mobile','province','country','status','billing_cycle','price','max_logins','created_at','activated_at','expiry_date','next_billing_date','referral_source','marketing_opt_in'];
+  const q=v=>{ v=v==null?'':String(v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+  const csv=[cols.join(',')+',active_logins'].concat(rows.map(c=>cols.map(k=>q(k.endsWith('_at')?d10(c[k]):c[k])).join(',')+','+activeLogins(c))).join('\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='ezfin-clients-'+iso(today())+'.csv'; a.click();
+}
+
+/* close modals with Escape */
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ $('cm').classList.remove('show'); $('nm').classList.remove('show'); } });
+
+/* boot */
+try{ session=JSON.parse(localStorage.getItem(SKEY)||'null'); }catch(e){ session=null; }
+if(session&&session.access_token) start(); else $('gEmail').focus();
+</script>
+</body>
+</html>
