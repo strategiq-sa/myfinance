@@ -2745,7 +2745,21 @@ async function removeUser(id){
   try{ await rpc('app_remove_login',{p_id:id}); await loadUsers(); usrMsg('Invite removed ✓',true); }
   catch(e){ usrMsg(e.message); }
 }
+async function verifyPayment(){
+  // after returning from iKhokha: ask the server to confirm the payment straight away (the webhook may still be on its way)
+  for(let i=0;i<4;i++){
+    try{
+      const res=await withAuth(()=>fetch(cfgUrl()+'/functions/v1/create-payment',{method:'POST',headers:restHeaders(),body:JSON.stringify({action:'verify'})}));
+      const d=await res.json().catch(()=>({}));
+      if(d.status==='Paid') return true;
+    }catch(e){}
+    await new Promise(r=>setTimeout(r,2500));
+  }
+  return false;
+}
 async function afterLogin(quiet, justSignedUp){
+  const payBack=new URLSearchParams(location.search).get('payment');
+  if(payBack==='success' && loggedIn()){ toast('Confirming your payment…'); await verifyPayment(); }
   const a=await checkAccess();
   if(a.offline){
     // server unreachable: allow offline use for a few days after the last successful check
@@ -2776,7 +2790,7 @@ async function afterLogin(quiet, justSignedUp){
   const q=new URLSearchParams(location.search), pay=q.get('payment');
   if(pay){
     history.replaceState(null,'',location.pathname);
-    if(pay==='success') toast('Payment received — thank you! It can take a minute to show.');
+    if(pay==='success') toast(a.status==='Active'?'Payment received — thank you! Your account is active ✓':'Payment received — it can take a minute to show. Refresh shortly.');
     else toast('Payment was not completed. You can try again from 👤 Account.',true);
   }
   if(!quiet && !justSignedUp && !pay) toast('Logged in ✓');
