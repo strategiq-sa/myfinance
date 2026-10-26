@@ -65,6 +65,7 @@ tbody tr.click:hover{background:var(--panel-2)}
 .pill{display:inline-block; padding:2px 9px; border-radius:999px; font-size:11.5px; font-weight:700; white-space:nowrap}
 .pill.Active,.pill.Paid,.pill.OK{background:var(--ok-soft); color:var(--ok)}
 .pill.Pending{background:var(--warn-soft); color:var(--warn)}
+.pill.Trial{background:#e6f0ff; color:#1d4ed8}
 .pill.Suspended,.pill.Failed,.pill.bad{background:var(--bad-soft); color:var(--bad)}
 .pill.Cancelled,.pill.Refunded,.pill.Disabled{background:var(--grey-soft); color:var(--grey)}
 .pill.warn{background:var(--warn-soft); color:var(--warn)}
@@ -123,7 +124,7 @@ tbody tr.click:hover{background:var(--panel-2)}
     <div class="card toolbar">
       <div class="fx grow"><label>Search</label><input class="field" id="q" placeholder="Name, email, client no, mobile…" oninput="renderList()"></div>
       <div class="fx"><label>Status</label><select class="field" id="fStatus" onchange="renderList()">
-        <option value="">All</option><option>Pending</option><option>Active</option><option>Suspended</option><option>Cancelled</option>
+        <option value="">All</option><option>Trial</option><option>Pending</option><option>Active</option><option>Suspended</option><option>Cancelled</option>
         <option value="due">Due in 7 days</option><option value="grace">In grace / overdue</option></select></div>
       <div class="fx"><label>Billing</label><select class="field" id="fCycle" onchange="renderList()"><option value="">All</option><option>Monthly</option><option>Annual</option></select></div>
       <button class="btn ghost" onclick="loadAll()">⟳ Refresh</button>
@@ -164,7 +165,7 @@ tbody tr.click:hover{background:var(--panel-2)}
           <div><label>Province</label><select class="field" id="d_province"><option value=""></option><option>Eastern Cape</option><option>Free State</option><option>Gauteng</option><option>KwaZulu-Natal</option><option>Limpopo</option><option>Mpumalanga</option><option>North West</option><option>Northern Cape</option><option>Western Cape</option><option>Outside SA</option></select></div>
           <div><label>Country</label><input class="field" id="d_country" value="ZA"></div>
 
-          <div><label>Status</label><select class="field" id="d_status"><option>Pending</option><option>Active</option><option>Suspended</option><option>Cancelled</option></select></div>
+          <div><label>Status</label><select class="field" id="d_status"><option>Trial</option><option>Pending</option><option>Active</option><option>Suspended</option><option>Cancelled</option></select></div>
           <div class="span2"><label>Reason for status (required when you change it)</label><input class="field" id="d_status_reason"></div>
 
           <div><label>Payment period</label><select class="field" id="d_billing_cycle" onchange="cycleChanged()"><option>Monthly</option><option>Annual</option></select></div>
@@ -345,7 +346,7 @@ function renderKpis(){
   const mrr=act.reduce((s,c)=>s+(c.billing_cycle==='Annual'?Number(c.price)/12:Number(c.price)),0);
   const due=clients.filter(c=>c.status==='Active'&&expiryState(c).k==='due').length;
   const gr=clients.filter(c=>['Active','Cancelled'].includes(c.status)&&['grace','expired'].includes(expiryState(c).k)).length;
-  const k=[['','All clients',clients.length],['Active','Active',n('Active')],['Pending','Pending',n('Pending')],['Suspended','Suspended',n('Suspended')],
+  const k=[['','All clients',clients.length],['Trial','Trial',n('Trial')],['Active','Active',n('Active')],['Pending','Pending',n('Pending')],['Suspended','Suspended',n('Suspended')],
            ['Cancelled','Cancelled',n('Cancelled')],['due','Due in 7 days',due],['grace','In grace / overdue',gr],['mrr','Monthly revenue',money(mrr)]];
   $('kpis').innerHTML=k.map(([f,l,v])=>`<div class="card kpi ${kpiFilter===f&&f!=='mrr'?'sel':''}" onclick="${f==='mrr'?'':`setKpi('${f}')`}"><div class="lab">${l}</div><div class="val num">${v}</div></div>`).join('');
 }
