@@ -340,6 +340,31 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
 .yearpick select{min-width:150px; font-weight:700}
 .ro-banner{display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:12px 16px; margin-bottom:16px; border-radius:var(--radius); border:1px solid var(--line); background:var(--accent-soft); font-size:13.5px}
 .ro-banner .btn{margin-left:auto}
+/* sign-up, plans & account (trial / subscription) */
+.gate-card.wide{max-width:520px; text-align:left}
+.gate-card.wide .gate-logo,.gate-card.wide .gate-ttl,.gate-card.wide .gate-sub{text-align:center}
+.gate .frow.two{grid-template-columns:1fr 1fr; gap:10px}
+.gate-switch{text-align:center; font-size:13px; color:var(--muted); margin-top:4px}
+.req{color:var(--expense)}
+.chk{display:flex; gap:9px; align-items:flex-start; font-size:12.5px; color:var(--text); margin:6px 0; text-align:left; line-height:1.4}
+.chk input{margin-top:2px; flex:none; width:16px; height:16px}
+.chk a{color:var(--brand); font-weight:700}
+.plan-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+.plan-card{border:1px solid var(--line); border-radius:12px; padding:16px; background:var(--panel-2); text-align:center; display:grid; gap:6px}
+.plan-card .pp{font-size:26px; font-weight:800; color:var(--navy)}
+[data-theme="dark"] .plan-card .pp{color:var(--accent)}
+.plan-card .pn{font-weight:800; font-size:15px}
+.plan-card .btn{justify-content:center}
+.plan-card .save{font-size:11.5px; font-weight:700; color:var(--income)}
+.usr-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:var(--panel-2); font-size:13px}
+.usr-row .who{flex:1; min-width:160px}
+.usr-row .who b{display:block}
+.usr-tag{display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; background:var(--chip); color:var(--muted)}
+.usr-tag.ok{background:var(--income-soft); color:var(--income)}
+.usr-tag.off{background:var(--expense-soft,#fde8e8); color:var(--expense)}
+.acct-grid{display:grid; grid-template-columns:auto 1fr; gap:6px 14px; font-size:13px}
+.acct-grid span:nth-child(odd){color:var(--muted); font-weight:700}
+@media (max-width:560px){ .plan-grid,.gate .frow.two{grid-template-columns:1fr} }
 .ystat{display:inline-block; padding:2px 9px; border-radius:999px; font-size:11.5px; font-weight:700}
 .ystat.open{background:var(--income-soft); color:var(--income)}
 .ystat.closed{background:var(--chip); color:var(--muted)}
@@ -376,6 +401,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
         <select class="field" id="yearSel" onchange="setActiveYear(this.value)"></select>
         <button class="hbtn" onclick="openYearsDialog()" title="Start, close and view financial years">📅 <span class="no-mobile">Years</span></button>
       </div>
+      <button class="hbtn" id="acctBtn" onclick="openAccount()" title="Your plan and users" style="display:none">👤 <span class="no-mobile">Account</span></button>
       <button class="hbtn" onclick="openSettings()" title="Cloud database settings">⚙️ <span class="no-mobile">Settings</span></button>
       <button class="hbtn" id="themeBtn" onclick="toggleTheme()" title="Toggle dark / light">🌙</button>
     </div>
@@ -861,14 +887,82 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
     <h2 class="gate-ttl">MyFinances</h2>
     <p class="gate-sub">Log in to open your data.</p>
     <div id="gateProject" class="tiny gate-proj"></div>
-    <div class="frow"><label>Email</label><input class="field" id="gateEmail" type="email" placeholder="you@example.com" autocomplete="username"></div>
-    <div class="frow"><label>Password</label><input class="field" id="gatePass" type="password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')authGateLogin()"></div>
-    <div id="gateMsg" class="gate-msg"></div>
-    <div class="gate-actions">
-      <button class="btn primary" style="flex:1" onclick="authGateLogin()">Log in</button>
-      <button class="btn ghost" style="flex:1" onclick="authGateSignup()">Create account</button>
+
+    <!-- LOG IN -->
+    <div id="gateLogin">
+      <div class="frow"><label>Email</label><input class="field" id="gateEmail" type="email" placeholder="you@example.com" autocomplete="username"></div>
+      <div class="frow"><label>Password</label><input class="field" id="gatePass" type="password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')authGateLogin()"></div>
+      <div id="gateMsg" class="gate-msg"></div>
+      <div class="gate-actions">
+        <button class="btn primary" style="flex:1" onclick="authGateLogin()">Log in</button>
+      </div>
+      <div class="gate-switch">New to EZ-Fin? <button class="linkbtn" onclick="gateMode('signup')">Start your 30-day free trial</button></div>
+      <div class="gate-switch">Forgot your password? <button class="linkbtn" onclick="authForgot()">Reset it</button></div>
+      <button class="linkbtn" id="gateOffline" onclick="authOffline()">Use this device offline instead</button>
     </div>
-    <button class="linkbtn" id="gateOffline" onclick="authOffline()">Use this device offline instead</button>
+
+    <!-- SIGN UP -->
+    <div id="gateSignup" style="display:none">
+      <div class="callout" style="margin-bottom:12px">30 days free — no card needed. Invited by an account owner? Sign up with the <b>same email</b> they added and you'll join their account.</div>
+      <div class="frow two">
+        <div class="frow"><label>First name <span class="req">*</span></label><input class="field" id="suFirst" autocomplete="given-name"></div>
+        <div class="frow"><label>Last name <span class="req">*</span></label><input class="field" id="suLast" autocomplete="family-name"></div>
+      </div>
+      <div class="frow"><label>Email <span class="req">*</span></label><input class="field" id="suEmail" type="email" placeholder="you@example.com" autocomplete="email"></div>
+      <div class="frow two">
+        <div class="frow"><label>Mobile</label><input class="field" id="suMobile" type="tel" placeholder="082 123 4567" autocomplete="tel"></div>
+        <div class="frow"><label>Country</label><select class="field" id="suCountry" onchange="suCountryChanged()"></select></div>
+      </div>
+      <div class="frow"><label id="suProvLbl">Province</label>
+        <select class="field" id="suProvSel"></select>
+        <input class="field" id="suProvTxt" placeholder="State / region" style="display:none">
+      </div>
+      <div class="frow two">
+        <div class="frow"><label>Password <span class="req">*</span></label><input class="field" id="suPass" type="password" placeholder="At least 8 characters" autocomplete="new-password"></div>
+        <div class="frow"><label>Confirm password <span class="req">*</span></label><input class="field" id="suPass2" type="password" autocomplete="new-password"></div>
+      </div>
+      <div class="frow"><label>How did you hear about us?</label><input class="field" id="suRef" placeholder="Facebook, a friend…"></div>
+      <label class="chk"><input type="checkbox" id="suPopia"><span>I agree to the <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a> and allow EZ-Fin to process my personal information as described in it (POPIA). <span class="req">*</span></span></label>
+      <label class="chk"><input type="checkbox" id="suMkt"><span>Send me news, tips and offers by email (optional — unsubscribe any time).</span></label>
+      <div id="suMsg" class="gate-msg"></div>
+      <div class="gate-actions"><button class="btn primary" style="flex:1" onclick="authGateSignup()">Create my account</button></div>
+      <div class="gate-switch">Already have an account? <button class="linkbtn" onclick="gateMode('login')">Log in</button></div>
+    </div>
+
+    <!-- CHOOSE A PLAN (trial over / suspended) -->
+    <div id="gatePay" style="display:none">
+      <div id="gatePayMsg" class="callout" style="margin-bottom:12px"></div>
+      <div id="gatePlans"></div>
+      <div id="gatePayErr" class="gate-msg"></div>
+      <div class="gate-switch"><button class="linkbtn" onclick="doLogout()">Log out</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- Account, plan & users -->
+<div class="modal-bg" id="accountModal">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-h"><h3>Your account</h3><button class="x" onclick="closeAccount()">×</button></div>
+    <div class="modal-b">
+      <div id="acctSummary" class="acct-grid"></div>
+      <div id="acctPlans"></div>
+      <div>
+        <h3 style="font-size:15px; margin-bottom:8px">Users <span class="tiny" id="usrCount"></span></h3>
+        <div id="usrList" style="display:grid; gap:8px"></div>
+        <div id="usrAdd" style="margin-top:12px; display:none">
+          <div class="frow two">
+            <div class="frow"><label>Email of person to add</label><input class="field" id="usrEmail" type="email" placeholder="partner@example.com"></div>
+            <div class="frow"><label>Their name</label><input class="field" id="usrName" placeholder="Optional"></div>
+          </div>
+          <div style="display:flex; gap:10px; align-items:center; margin-top:8px; flex-wrap:wrap">
+            <button class="btn primary sm" onclick="addUser()">＋ Add user</button>
+            <span class="tiny">They then go to EZ-Fin, tap <b>Start your 30-day free trial</b> and sign up with this email — they join your account and share your data.</span>
+          </div>
+        </div>
+        <div id="usrMsg" class="gate-msg"></div>
+      </div>
+    </div>
+    <div class="modal-f"><button class="btn ghost" onclick="closeAccount()">Close</button></div>
   </div>
 </div>
 
@@ -940,7 +1034,14 @@ function blankState(){
            settings:{ supaUrl:'', supaKey:'', userName:(DEFAULT_LISTS.persons[0]||''), currency:{code:'ZAR',symbol:'R'} },
            archived:[], years:{} };
 }
-function save(){ localStorage.setItem(LS, JSON.stringify(state)); if(cloudOn()) cloudPush(); }
+function save(){
+  if(typeof subReadOnly==='function' && subReadOnly() && cloudOn()){
+    // trial ended: data is view-only — undo the change by reloading the cloud copy
+    toast('View-only — choose a plan to make changes',true);
+    cloudPull().then(()=>render()); openAccount(true); return;
+  }
+  localStorage.setItem(LS, JSON.stringify(state)); if(cloudOn()) cloudPush();
+}
 function load(){
   const raw = localStorage.getItem(LS);
   if(raw){ try{ state = JSON.parse(raw); }catch(e){ state = null; } }
@@ -2340,8 +2441,8 @@ function sbErr(d,r,fallback){
   return (d&&(d.msg||d.error_description||d.error_message||d.message||d.error))
     || (r&&r.status ? ('Supabase said '+r.status+(r.statusText?' '+r.statusText:'')) : '') || fallback;
 }
-async function sbSignUp(email,password){
-  let r; try{ r=await fetch(cfgUrl()+'/auth/v1/signup',{method:'POST',headers:authHeaders(),body:JSON.stringify({email,password})}); }
+async function sbSignUp(email,password,meta){
+  let r; try{ r=await fetch(cfgUrl()+'/auth/v1/signup',{method:'POST',headers:authHeaders(),body:JSON.stringify({email,password,data:meta||{}})}); }
   catch(e){ throw new Error('Cannot reach Supabase — check the Project URL is correct (https://xxxx.supabase.co) and that you are online.'); }
   const d=await r.json().catch(()=>({}));
   if(!r.ok) throw new Error(sbErr(d,r,'Sign-up failed'));
@@ -2380,10 +2481,11 @@ async function checkAccess(){
     return await res.json();
   }catch(e){ return {offline:true}; }
 }
-function showSubNotice(msg){
+function showSubNotice(msg,planBtn){
   const el=document.getElementById('subNotice'); if(!el) return;
-  el.innerHTML = msg ? `<div class="banner">🔔 <span>${esc(msg)}</span></div>` : '';
+  el.innerHTML = msg ? `<div class="banner">🔔 <span>${esc(msg)}</span>${planBtn?'<button class="btn primary sm" onclick="openAccount(true)">💳 Choose a plan</button>':''}</div>` : '';
 }
+function subReadOnly(){ return !!(accessInfo && accessInfo.read_only); }
 function clientId(){ return session && session.client_id ? session.client_id : null; }
 
 /* full-state sync — one shared data set per client (up to 3 logins share it) */
@@ -2453,7 +2555,7 @@ function showAuthGate(){
   if(logo&&hdr) logo.src=hdr.src;
   document.getElementById('gateProject').textContent = CLOUD_FORCED ? '' : (configured()?('Project: '+cfgUrl()):'');
   const off=document.getElementById('gateOffline'); if(off) off.style.display = CLOUD_FORCED?'none':'';
-  gateMsg('');
+  gateMsg(''); gateMode('login');
   g.classList.add('show');
   setTimeout(()=>{ const e=document.getElementById('gateEmail'); if(e) e.focus(); },50);
 }
@@ -2470,19 +2572,174 @@ async function authGateLogin(){
     else gateMsg(m);
   }
 }
-async function authGateSignup(){
-  const email=document.getElementById('gateEmail').value.trim(), pass=document.getElementById('gatePass').value;
-  if(!email||pass.length<6){ gateMsg('Enter an email and a password of at least 6 characters.'); return; }
-  gateMsg('Creating account…',true);
-  try{
-    const instant=await sbSignUp(email,pass);
-    if(instant){ await afterLogin(false,true); }
-    else { gateMsg('Account created — check your email to confirm, then log in.',true); }
-  }catch(e){ const m=e.message||'Sign-up failed.';
-    if(/already|exists|registered/i.test(m)) gateMsg('That email already has an account — tap \u201CLog in\u201D instead.');
-    else if(/signups? not allowed|signup.*disabled/i.test(m)) gateMsg('Sign-ups are turned off in Supabase. Enable them under Authentication \u2192 Sign In / Providers.');
-    else gateMsg(m);
+/* ---------- sign-up form ---------- */
+const SA_PROVINCES=['Eastern Cape','Free State','Gauteng','KwaZulu-Natal','Limpopo','Mpumalanga','North West','Northern Cape','Western Cape'];
+const COUNTRIES=[['ZA','South Africa'],['BW','Botswana'],['LS','Lesotho'],['MZ','Mozambique'],['NA','Namibia'],['SZ','Eswatini'],['ZM','Zambia'],['ZW','Zimbabwe'],
+  ['KE','Kenya'],['NG','Nigeria'],['GB','United Kingdom'],['IE','Ireland'],['US','United States'],['CA','Canada'],['AU','Australia'],['NZ','New Zealand'],['AE','United Arab Emirates'],['OTHER','Other']];
+function gateMode(mode){
+  const ids={login:'gateLogin',signup:'gateSignup',pay:'gatePay'};
+  Object.entries(ids).forEach(([k,id])=>{ const el=document.getElementById(id); if(el) el.style.display = k===mode?'':'none'; });
+  const card=document.querySelector('#authGate .gate-card'); if(card) card.classList.toggle('wide', mode!=='login');
+  const sub=document.querySelector('#authGate .gate-sub');
+  if(sub) sub.textContent = mode==='signup' ? 'Create your account — 30 days free.' : mode==='pay' ? 'Choose a plan to continue.' : 'Log in to open your data.';
+  if(mode==='signup'){
+    const c=document.getElementById('suCountry');
+    if(c && !c.options.length){ c.innerHTML=COUNTRIES.map(([v,n])=>`<option value="${v}">${esc(n)}</option>`).join(''); c.value='ZA'; }
+    const p=document.getElementById('suProvSel');
+    if(p && !p.options.length) p.innerHTML='<option value="">— Select —</option>'+SA_PROVINCES.map(x=>`<option>${esc(x)}</option>`).join('');
+    const le=document.getElementById('gateEmail'), se=document.getElementById('suEmail');
+    if(le&&se&&!se.value) se.value=le.value.trim();
+    suCountryChanged(); suMsg('');
+    setTimeout(()=>{ const f=document.getElementById('suFirst'); if(f) f.focus(); },50);
   }
+}
+function suCountryChanged(){
+  const za=(document.getElementById('suCountry').value==='ZA');
+  document.getElementById('suProvSel').style.display = za?'':'none';
+  document.getElementById('suProvTxt').style.display = za?'none':'';
+  document.getElementById('suProvLbl').textContent = za?'Province':'State / region';
+}
+function suMsg(t,ok){ const m=document.getElementById('suMsg'); if(!m) return; m.textContent=t||''; m.className='gate-msg'+(t?(ok?' ok':' err'):''); }
+async function authGateSignup(){
+  const v=id=>(document.getElementById(id).value||'').trim();
+  const first=v('suFirst'), last=v('suLast'), email=v('suEmail'), pass=document.getElementById('suPass').value, pass2=document.getElementById('suPass2').value;
+  const country=v('suCountry'), province = country==='ZA' ? v('suProvSel') : v('suProvTxt');
+  const popia=document.getElementById('suPopia').checked, mkt=document.getElementById('suMkt').checked;
+  if(!first||!last){ suMsg('Please enter your first name and last name.'); return; }
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ suMsg('Please enter a valid email address.'); return; }
+  if(pass.length<8){ suMsg('Your password must be at least 8 characters.'); return; }
+  if(pass!==pass2){ suMsg('The two passwords do not match.'); return; }
+  if(!popia){ suMsg('Please tick the Privacy Policy box to continue.'); return; }
+  const meta={ first_name:first, last_name:last, mobile:v('suMobile'), province, country, referral:v('suRef'),
+               popia:true, marketing:mkt, popia_at:new Date().toISOString() };
+  suMsg('Creating your account…',true);
+  try{
+    const instant=await sbSignUp(email,pass,meta);
+    if(instant){ await afterLogin(false,true); }
+    else { gateMode('login'); document.getElementById('gateEmail').value=email;
+           gateMsg('Account created ✓ Check your email and click the confirmation link, then log in here.',true); }
+  }catch(e){ const m=e.message||'Sign-up failed.';
+    if(/already|exists|registered/i.test(m)){ gateMode('login'); document.getElementById('gateEmail').value=email; gateMsg('That email already has an account — log in below.'); }
+    else if(/signups? not allowed|signup.*disabled/i.test(m)) suMsg('New sign-ups are paused at the moment. Please email admin@ez-fin.co.za.');
+    else suMsg(m);
+  }
+}
+async function authForgot(){
+  const email=document.getElementById('gateEmail').value.trim();
+  if(!email){ gateMsg('Type your email address above first, then tap “Reset it”.'); return; }
+  try{
+    await fetch(cfgUrl()+'/auth/v1/recover',{method:'POST',headers:authHeaders(),
+      body:JSON.stringify({email, redirect_to:location.origin+location.pathname})});
+    gateMsg('If that email has an account, a reset link is on its way. Check your inbox.',true);
+  }catch(e){ gateMsg('Cannot reach the server. Please try again.'); }
+}
+
+/* ---------- plans & payment ---------- */
+let planPrices=null;
+async function loadPrices(){
+  if(planPrices) return planPrices;
+  try{ const r=await fetch(cfgUrl()+'/rest/v1/plan_prices?select=plan,price,currency',{headers:authHeaders()}); if(r.ok){ const rows=await r.json(); planPrices={}; rows.forEach(x=>planPrices[x.plan]=Number(x.price)); } }catch(e){}
+  if(!planPrices||!planPrices.Monthly) planPrices={Monthly:50,Annual:500};
+  return planPrices;
+}
+function money0(n){ return 'R'+Number(n).toLocaleString('en-ZA',{maximumFractionDigits:2}); }
+async function plansHTML(errId){
+  const p=await loadPrices(), saving=Math.max(0,p.Monthly*12-p.Annual);
+  return `<div class="plan-grid">
+    <div class="plan-card"><div class="pn">Monthly</div><div class="pp">${money0(p.Monthly)}</div><div class="tiny">per month</div>
+      <button class="btn primary" onclick="startPayment('Monthly','${errId}')">Pay monthly</button></div>
+    <div class="plan-card"><div class="pn">Annual</div><div class="pp">${money0(p.Annual)}</div><div class="tiny">per year</div>
+      ${saving?`<div class="save">Save ${money0(saving)} a year</div>`:''}
+      <button class="btn primary" onclick="startPayment('Annual','${errId}')">Pay annually</button></div>
+  </div><p class="tiny" style="margin-top:8px">Secure card payment by iKhokha. Up to 3 users share one account.</p>`;
+}
+async function startPayment(plan,errId){
+  const out=document.getElementById(errId);
+  const say=(t,ok)=>{ if(out){ out.textContent=t; out.className='gate-msg'+(ok?' ok':' err'); } };
+  say('Opening secure payment…',true);
+  try{
+    const res=await withAuth(()=>fetch(cfgUrl()+'/functions/v1/create-payment',{method:'POST',headers:restHeaders(),
+      body:JSON.stringify({plan, return_url:location.origin+location.pathname})}));
+    const d=await res.json().catch(()=>({}));
+    if(res.ok && d.url){ location.href=d.url; return; }
+    if(res.status===404) say('Online payment is being set up. Please email admin@ez-fin.co.za and we will help you pay.');
+    else say(d.error||d.message||'Could not start the payment. Please try again.');
+  }catch(e){ say('Online payment is being set up. Please email admin@ez-fin.co.za and we will help you pay.'); }
+}
+async function showPayGate(a){
+  gateMode('pay'); document.getElementById('authGate').classList.add('show');
+  document.getElementById('gatePayMsg').textContent=a.message||'Choose a plan to continue.';
+  document.getElementById('gatePlans').innerHTML=await plansHTML('gatePayErr');
+}
+
+/* ---------- account & users ---------- */
+async function openAccount(focusPlans){
+  if(!loggedIn()||!accessInfo) return;
+  document.getElementById('accountModal').classList.add('show');
+  const a=accessInfo, f=d=>d?new Date(d+'T00:00:00').toLocaleDateString('en-ZA',{day:'2-digit',month:'short',year:'numeric'}):'—';
+  const status = a.status==='Trial' ? (a.read_only?'Trial ended (view-only)':'Free trial') : a.status;
+  document.getElementById('acctSummary').innerHTML=
+    `<span>Account no.</span><span>${esc(a.client_no||'—')}</span>`+
+    `<span>Status</span><span><b>${esc(status||'—')}</b></span>`+
+    (a.status==='Trial'?'':`<span>Plan</span><span>${esc(a.billing_cycle||'—')}</span>`)+
+    `<span>${a.status==='Trial'?'Trial ends':'Paid up to'}</span><span>${f(a.expiry_date)}</span>`+
+    `<span>You are</span><span>${a.role==='Owner'?'Account owner':'Member'}</span>`;
+  document.getElementById('acctPlans').innerHTML =
+    `<h3 style="font-size:15px; margin-bottom:8px">${a.status==='Trial'?'Choose a plan':'Renew or change plan'}</h3>`+
+    (await plansHTML('acctPayErr'))+`<div id="acctPayErr" class="gate-msg"></div>`;
+  loadUsers();
+  if(focusPlans) document.getElementById('acctPlans').scrollIntoView({block:'nearest'});
+}
+function closeAccount(){ document.getElementById('accountModal').classList.remove('show'); }
+function usrMsg(t,ok){ const m=document.getElementById('usrMsg'); m.textContent=t||''; m.className='gate-msg'+(t?(ok?' ok':' err'):''); }
+async function rpc(name,args){
+  const res=await withAuth(()=>fetch(cfgUrl()+'/rest/v1/rpc/'+name,{method:'POST',headers:restHeaders(),body:JSON.stringify(args||{})}));
+  const d=await res.json().catch(()=>null);
+  if(!res.ok) throw new Error((d&&(d.message||d.hint))||'Something went wrong.');
+  return d;
+}
+async function loadUsers(){
+  const list=document.getElementById('usrList'), owner=accessInfo&&accessInfo.role==='Owner';
+  usrMsg(''); list.innerHTML='<div class="tiny">Loading…</div>';
+  try{
+    const res=await withAuth(()=>fetch(cfgUrl()+'/rest/v1/client_logins?select=id,email,full_name,role,status,user_id,last_login_at&order=added_at',{headers:restHeaders()}));
+    const rows=res.ok?await res.json():[];
+    const active=rows.filter(r=>r.status==='Active').length;
+    document.getElementById('usrCount').textContent=`(${active} of 3 in use)`;
+    list.innerHTML=rows.map(r=>{
+      const tag = r.role==='Owner' ? '<span class="usr-tag ok">Owner</span>'
+        : r.status==='Disabled' ? '<span class="usr-tag off">Disabled</span>'
+        : r.user_id ? '<span class="usr-tag ok">Joined</span>' : '<span class="usr-tag">Invited — not signed up yet</span>';
+      let btns='';
+      if(owner && r.role!=='Owner'){
+        btns = r.status==='Active'
+          ? `<button class="btn ghost sm" onclick="setUserStatus('${r.id}','Disabled')">Disable</button>`
+          : `<button class="btn ghost sm" onclick="setUserStatus('${r.id}','Active')">Enable</button>`;
+        if(!r.user_id) btns+=` <button class="btn danger sm" onclick="removeUser('${r.id}')">Remove</button>`;
+      }
+      return `<div class="usr-row"><div class="who"><b>${esc(r.full_name||r.email)}</b><span class="tiny">${esc(r.email)}</span></div>${tag}${btns}</div>`;
+    }).join('') || '<div class="tiny">No users found.</div>';
+    document.getElementById('usrAdd').style.display = owner && active<3 ? '' : 'none';
+    if(!owner) usrMsg('Users are managed by the account owner.',true);
+    else if(active>=3) usrMsg('All 3 logins are in use. Disable or remove one to add someone else.',true);
+  }catch(e){ list.innerHTML='<div class="tiny">Could not load users.</div>'; }
+}
+async function addUser(){
+  const email=document.getElementById('usrEmail').value.trim(), name=document.getElementById('usrName').value.trim();
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ usrMsg('Please enter a valid email address.'); return; }
+  try{ await rpc('app_add_login',{p_email:email,p_name:name||null});
+    document.getElementById('usrEmail').value=''; document.getElementById('usrName').value='';
+    await loadUsers(); usrMsg(`Added ✓ Ask ${name||email} to sign up on EZ-Fin with ${email}.`,true);
+  }catch(e){ usrMsg(e.message); }
+}
+async function setUserStatus(id,st){
+  try{ await rpc('app_set_login_status',{p_id:id,p_status:st}); await loadUsers(); usrMsg(st==='Active'?'User enabled ✓':'User disabled ✓',true); }
+  catch(e){ usrMsg(e.message); }
+}
+async function removeUser(id){
+  if(!confirm('Remove this invite?')) return;
+  try{ await rpc('app_remove_login',{p_id:id}); await loadUsers(); usrMsg('Invite removed ✓',true); }
+  catch(e){ usrMsg(e.message); }
 }
 async function afterLogin(quiet, justSignedUp){
   const a=await checkAccess();
@@ -2497,6 +2754,8 @@ async function afterLogin(quiet, justSignedUp){
     saveSession(null); showAuthGate(); gateMsg('Cannot reach the server. Please check your internet connection and try again.'); return;
   }
   if(!a.allowed){
+    accessInfo=a;
+    if(a.can_pay){ setCloud('local'); showAuthGate(); await showPayGate(a); return; }   // keep the session so they can pay
     saveSession(null); setCloud('local'); showAuthGate();
     gateMsg((justSignedUp?'Account created ✓ ':'')+(a.message||'Access is not allowed for this account.'), !!justSignedUp);
     return;
@@ -2504,11 +2763,19 @@ async function afterLogin(quiet, justSignedUp){
   session.client_id=a.client_id; session.last_ok=Date.now(); session.client_no=a.client_no; saveSession(session);
   accessInfo=a;
   hideAuthGate();
-  if(!quiet) toast('Syncing your data…');
+  const ab=document.getElementById('acctBtn'); if(ab) ab.style.display='';
+  if(!quiet) toast(justSignedUp?'Welcome to EZ-Fin — your 30-day free trial has started 🎉':'Syncing your data…');
   await cloudPull();
   render(); updateAuthUI();
-  showSubNotice(a.message||'');
-  if(!quiet) toast('Logged in ✓');
+  const nearEnd = a.status==='Trial' || a.read_only || (a.status==='Active' && a.days_left!=null && a.days_left<10);
+  showSubNotice(a.message||'', nearEnd && a.can_pay);
+  const q=new URLSearchParams(location.search), pay=q.get('payment');
+  if(pay){
+    history.replaceState(null,'',location.pathname);
+    if(pay==='success') toast('Payment received — thank you! It can take a minute to show.');
+    else toast('Payment was not completed. You can try again from 👤 Account.',true);
+  }
+  if(!quiet && !justSignedUp && !pay) toast('Logged in ✓');
 }
 function authOffline(){
   if(CLOUD_FORCED) return;   // this deployment is cloud-only — no offline bypass
@@ -2534,7 +2801,9 @@ function updateAuthUI(){
       `<button class="btn primary sm" style="margin-left:auto" onclick="closeSettings();showAuthGate()">Log in</button></div>`;
   }
 }
-function doLogout(){ saveSession(null); showSubNotice(''); setCloud('local'); updateAuthUI(); closeSettings(); showAuthGate(); toast('Logged out'); }
+function doLogout(){ saveSession(null); accessInfo=null; showSubNotice(''); setCloud('local'); updateAuthUI(); closeSettings(); closeAccount();
+  const ab=document.getElementById('acctBtn'); if(ab) ab.style.display='none';
+  showAuthGate(); toast('Logged out'); }
 function openSettings(){
   document.getElementById('supaUrl').value=state.settings.supaUrl||'';
   document.getElementById('supaKey').value=state.settings.supaKey||'';
