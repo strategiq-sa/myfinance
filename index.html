@@ -343,7 +343,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
 .ystat{display:inline-block; padding:2px 9px; border-radius:999px; font-size:11.5px; font-weight:700}
 .ystat.open{background:var(--income-soft); color:var(--income)}
 .ystat.closed{background:var(--chip); color:var(--muted)}
-#yearsModal td.num{white-space:nowrap}
+#view-years td.num{white-space:nowrap}
 .year-rules{display:grid; gap:4px; margin:0; padding-left:18px; font-size:13px}
 @media print{
   header.top, nav.tabs, .filters, .no-print, #toast{display:none !important}
@@ -386,6 +386,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
       <button data-view="budget"><span class="ic">🎯</span>Budget</button>
       <button data-view="reports"><span class="ic">📑</span>Reports</button>
       <button data-view="tax"><span class="ic">🧾</span>Tax</button>
+      <button data-view="years"><span class="ic">📅</span>Years</button>
       <button data-view="setup"><span class="ic">⚙️</span>Setup</button>
     </nav>
   </header>
@@ -617,6 +618,36 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
       </div>
     </section>
 
+    <!-- ============ YEARS ============ -->
+    <section class="view" id="view-years">
+      <div class="page-head">
+        <div>
+          <div class="eyebrow">1 March – end February</div>
+          <h2>Financial years</h2>
+          <p class="desc">Switch between years, start a new one, or close a finished year to lock and archive it.</p>
+        </div>
+        <div class="no-print" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+          <span class="tiny" id="yearsHint"></span>
+          <button class="btn primary" id="newYearBtn" onclick="startNewYear()">＋ Start new year</button>
+        </div>
+      </div>
+      <div class="callout" style="margin-bottom:16px">
+        <ul class="year-rules">
+          <li>All pages report on the year chosen in the <b>year picker</b> at the top, or with <b>Switch to</b> below.</li>
+          <li>Up to <b>2 years can be open</b> at the same time (e.g. finishing last year while starting the new one).</li>
+          <li><b>Closing</b> a year locks it — no adding, editing or deleting. It stays viewable.</li>
+          <li><b>5 closed years</b> are kept. Closing a 6th removes the oldest (a CSV copy downloads first).</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-h"><h3>Your years</h3><span class="hint">Newest first</span></div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Year</th><th>Period</th><th>Status</th><th class="r">Lines</th><th class="r">Income</th><th class="r">Expenses</th><th class="r">Surplus</th><th></th></tr></thead>
+          <tbody id="yearsBody"></tbody>
+        </table></div>
+      </div>
+    </section>
+
     <!-- ============ SETUP ============ -->
     <section class="view" id="view-setup">
       <div class="page-head">
@@ -682,7 +713,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
       <div class="card pad" style="margin-top:16px">
         <h3 style="margin-bottom:6px">Financial years <span class="tiny">(1 Mar – end Feb)</span></h3>
         <p class="tiny" style="margin-bottom:12px">Close a finished year to lock and archive it, then start the next one. Up to 2 years can be open at once and 5 closed years are kept.</p>
-        <button class="btn primary" onclick="openYearsDialog()">📅 Manage financial years</button>
+        <button class="btn primary" onclick="openYearsDialog()">📅 Go to Years</button>
       </div>
       <div class="card pad" style="margin-top:16px">
         <h3 style="margin-bottom:6px">Data</h3>
@@ -754,32 +785,6 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
       <button class="btn danger" id="disconnectBtn" onclick="disconnectCloud()" style="margin-right:auto">Disconnect</button>
       <button class="btn ghost" id="settingsCancel" onclick="closeSettings()">Cancel</button>
       <button class="btn primary" id="saveConnBtn" onclick="saveSettings()">Save connection</button>
-    </div>
-  </div>
-</div>
-
-<!-- Financial years dialog -->
-<div class="modal-bg" id="yearsModal">
-  <div class="modal" style="max-width:940px">
-    <div class="modal-h"><h3>Financial years</h3><button class="x" onclick="closeYears()">×</button></div>
-    <div class="modal-b">
-      <div class="callout">
-        <ul class="year-rules">
-          <li>A financial year runs <b>1 March – end of February</b>. All pages report on the year chosen at the top.</li>
-          <li>Up to <b>2 years can be open</b> at the same time (e.g. finishing last year while starting the new one).</li>
-          <li><b>Closing</b> a year locks it — no adding, editing or deleting. It stays viewable.</li>
-          <li><b>5 closed years</b> are kept. Closing a 6th removes the oldest (a CSV copy downloads first).</li>
-        </ul>
-      </div>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Year</th><th>Period</th><th>Status</th><th class="r">Lines</th><th class="r">Income</th><th class="r">Expenses</th><th class="r">Surplus</th><th></th></tr></thead>
-        <tbody id="yearsBody"></tbody>
-      </table></div>
-    </div>
-    <div class="modal-f">
-      <span class="tiny" id="yearsHint" style="margin-right:auto; align-self:center"></span>
-      <button class="btn ghost" onclick="closeYears()">Close</button>
-      <button class="btn primary" id="newYearBtn" onclick="startNewYear()">＋ Start new year</button>
     </div>
   </div>
 </div>
@@ -1087,8 +1092,7 @@ function renderYearNotice(){
 }
 
 /* ---- dialog ---- */
-function openYearsDialog(){ renderYears(); document.getElementById('yearsModal').classList.add('show'); }
-function closeYears(){ document.getElementById('yearsModal').classList.remove('show'); }
+function openYearsDialog(){ goView('years'); }
 function nextYearToStart(){ const all=allYears(); return all.length ? all[0]+1 : fyStartOf(todayISO()); }
 function renderYears(){
   const body=document.getElementById('yearsBody'); if(!body) return;
@@ -1099,14 +1103,14 @@ function renderYears(){
       ? `<button class="btn danger sm" onclick="closeYear(${y})">🔒 Close year</button>`
       : `<span class="tiny">Closed ${(rec.closedAt||'').slice(0,10)}</span>`;
     return `<tr>
-      <td><b>${fyLabel(y)}</b>${y===activeYear()?' <span class="tiny">(viewing)</span>':''}</td>
+      <td><b>${fyLabel(y)}</b>${y===activeYear()?' <span class="ystat open" style="margin-left:4px">Viewing</span>':''}</td>
       <td class="tiny">${fyPeriod(y)}</td>
       <td><span class="ystat ${st}">${st==='open'?'Open':'Closed'}</span></td>
       <td class="r num">${t.n}</td>
       <td class="r num">${fmt0(t.inc)}</td>
       <td class="r num">${fmt0(t.exp)}</td>
       <td class="r num ${t.surplus<0?'neg':'pos'}">${fmt0(t.surplus)}</td>
-      <td style="white-space:nowrap"><button class="btn ghost sm" onclick="closeYears(); setActiveYear(${y})">View</button>
+      <td style="white-space:nowrap">${y===activeYear()?'':`<button class="btn ghost sm" onclick="setActiveYear(${y}); toast('Now viewing ${fyLabel(y)}')">Switch to</button>`}
         <button class="btn ghost sm" onclick="exportCsv(${y})">CSV</button> ${act}</td>
     </tr>`;
   }).join('');
@@ -2605,6 +2609,7 @@ function render(){
     case 'budget': renderBudget(); break;
     case 'reports': renderReports(); break;
     case 'tax': renderTax(); break;
+    case 'years': renderYears(); break;
     case 'setup': renderSetup(); break;
   }
 }
