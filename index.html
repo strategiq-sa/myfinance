@@ -715,7 +715,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
           <h3 style="margin-bottom:4px">People <span class="tiny">(max 3)</span></h3>
           <div class="chips" id="listPersons"></div>
           <div class="add-inline"><input class="field" id="addPerson" placeholder="Add person…" style="flex:1"><button class="btn primary sm" onclick="addSimple('persons','addPerson')">Add</button></div>
-          <h3 style="margin:16px 0 4px">Your name <span class="tiny">(greeting on the Dashboard)</span></h3>
+          <h3 style="margin:16px 0 4px">Default person <span class="tiny">(pre-filled on new transactions)</span></h3>
           <div class="add-inline"><input class="field" id="userNameInput" placeholder="e.g. Clint" style="flex:1" oninput="setUserName(this.value)"></div>
         </div>
       </div>
@@ -1336,7 +1336,9 @@ function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;',
    ============================================================ */
 function renderGreeting(){
   const el=document.getElementById('greeting'); if(!el) return;
-  const name=((state.settings&&state.settings.userName)||'').trim();
+  // each person is greeted by their own login name (3 users share one data set); fall back to the Setup name offline
+  const own=(typeof accessInfo!=='undefined' && accessInfo && loggedIn() && accessInfo.first_name)||'';
+  const name=(own||(state.settings&&state.settings.userName)||'').trim();
   el.textContent = name ? `Hi ${name}, welcome back.` : '';
 }
 function renderDashboard(){
@@ -2514,6 +2516,8 @@ async function cloudPull(){
       // brand-new client: start with a clean slate (never upload another person's data left on this device)
       const keepUrl=cfgUrl(), keepKey=cfgKey();
       state=blankState(); state.settings=state.settings||{}; state.settings.supaUrl=keepUrl; state.settings.supaKey=keepKey;
+      const fn=(accessInfo&&accessInfo.first_name)||'';   // start with the new client's own name, not the sample names
+      state.lists.persons = fn ? [fn] : ['Me']; state.settings.userName = fn || '';
       normalizeState(); localStorage.setItem(LS,JSON.stringify(state));
       await cloudPush(true);
     }
