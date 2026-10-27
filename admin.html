@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+<script>/* SSL: always use the secure https:// address */
+if(location.protocol==='http:'&&!/^(localhost|127\.0\.0\.1)$/.test(location.hostname)){location.replace('https://'+location.host+location.pathname+location.search+location.hash);}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>EZFin Admin</title>
@@ -343,11 +346,13 @@ function activeLogins(c){ return (c.client_logins||[]).filter(x=>x.status==='Act
 function renderKpis(){
   const n=s=>clients.filter(c=>c.status===s).length;
   const act=clients.filter(c=>c.status==='Active');
-  const mrr=act.reduce((s,c)=>s+(c.billing_cycle==='Annual'?Number(c.price)/12:Number(c.price)),0);
+  const mon=act.filter(c=>c.billing_cycle!=='Annual').reduce((s,c)=>s+Number(c.price||0),0);
+  const ann=act.filter(c=>c.billing_cycle==='Annual').reduce((s,c)=>s+Number(c.price||0),0);
+  const yr=mon*12+ann;
   const due=clients.filter(c=>c.status==='Active'&&expiryState(c).k==='due').length;
   const gr=clients.filter(c=>['Active','Cancelled'].includes(c.status)&&['grace','expired'].includes(expiryState(c).k)).length;
   const k=[['','All clients',clients.length],['Trial','Trial',n('Trial')],['Active','Active',n('Active')],['Pending','Pending',n('Pending')],['Suspended','Suspended',n('Suspended')],
-           ['Cancelled','Cancelled',n('Cancelled')],['due','Due in 7 days',due],['grace','In grace / overdue',gr],['mrr','Monthly revenue',money(mrr)]];
+           ['Cancelled','Cancelled',n('Cancelled')],['due','Due in 7 days',due],['grace','In grace / overdue',gr],['mrr','Monthly plans (per month)',money(mon)],['mrr','Annual plans (per year)',money(ann)],['mrr','Total revenue per year',money(yr)]];
   $('kpis').innerHTML=k.map(([f,l,v])=>`<div class="card kpi ${kpiFilter===f&&f!=='mrr'?'sel':''}" onclick="${f==='mrr'?'':`setKpi('${f}')`}"><div class="lab">${l}</div><div class="val num">${v}</div></div>`).join('');
 }
 function setKpi(f){ kpiFilter=f; $('fStatus').value=f; renderKpis(); renderList(); }
