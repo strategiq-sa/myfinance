@@ -386,6 +386,60 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
 }
 .print-head{display:none; align-items:center; gap:12px; margin-bottom:16px}
 .print-head img{height:52px}
+/* ===== MOBILE LAYOUT FIX (phones & small tablets) ===== */
+@media (max-width:760px){
+  .top-row{flex-wrap:wrap; gap:8px; padding:8px 12px}
+  .brand{width:100%; gap:10px}
+  .logo-chip{padding:5px 8px; border-radius:10px}
+  .logo-chip img{height:36px}
+  .brand .ttl{font-size:15px; line-height:1.2}
+  .brand .sub{font-size:10px; letter-spacing:.08em}
+  .top-row .spacer{display:none}
+  .no-mobile{display:none}
+  .yearpick{flex:1; min-width:0}
+  .yearpick select{min-width:0; width:100%}
+  .hbtn{padding:8px 10px}
+  .status{order:9; width:100%; font-size:11px}
+  nav.tabs{padding:0 6px}
+  nav.tabs button{padding:10px 11px 11px; font-size:13px}
+  main{padding:12px}
+  .page-head h2{font-size:19px}
+  .card.pad{padding:14px}
+  .card-h{flex-wrap:wrap; padding:12px 14px}
+  .kpi-flow{grid-template-columns:1fr 1fr; gap:8px}
+  .kpi{border-radius:var(--radius) !important; border-right:1px solid var(--line) !important; padding:12px}
+  .kpi:last-child{grid-column:1 / -1}
+  .kpi .op{display:none}
+  .kpi .val{font-size:19px}
+  .filters{padding:12px; gap:10px}
+  .filters .fx{flex:1 1 calc(50% - 10px); min-width:0}
+  .filters .field{width:100%}
+  .filters .flush{margin-left:0; width:100%; flex-wrap:wrap}
+  .field{min-width:0}
+  input,select,textarea,.field,.st-in,.budget-tbl input{font-size:16px}
+  .modal-bg{padding:10px 8px}
+  .modal-b{max-height:none; padding:16px}
+  .frow.two{grid-template-columns:1fr}
+  .modal-f{flex-wrap:wrap}
+  .modal-f .btn{flex:1; justify-content:center}
+  .bar-row{grid-template-columns:84px 1fr auto; gap:8px; font-size:12px}
+  .month-chart{overflow-x:auto; gap:6px; padding:16px 10px 8px}
+  .mc-col{min-width:24px}
+  .mc-bar{width:6px}
+  table{font-size:12.5px}
+  th,td{padding:8px 9px}
+  .add-inline{max-width:none}
+  .claim-grid{grid-template-columns:1fr}
+  .map-row{grid-template-columns:1fr}
+  .banner .btn,.ro-banner .btn{margin-left:0}
+  .gate-card{padding:22px 18px}
+  #toast{left:12px; right:12px; transform:translateY(30px)}
+  #toast.show{transform:translateY(0)}
+}
+@media (max-width:380px){
+  .kpi-flow{grid-template-columns:1fr}
+  .brand .sub{display:none}
+}
 </style>
 </head>
 <body>
