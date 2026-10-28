@@ -98,6 +98,19 @@ tbody tr.click:hover{background:var(--panel-2)}
 #toast.show{transform:translateX(-50%) translateY(0)}
 #toast.err{background:var(--bad)}
 .hide{display:none !important}
+.print-only{display:none}
+@media print{
+  @page{size:A4 landscape; margin:12mm}
+  :root,:root:not([data-theme="light"]){--bg:#fff;--panel:#fff;--panel-2:#f3f6f9;--line:#c9d3dd;--text:#000;--muted:#444;--shadow:none}
+  body{background:#fff; font-size:11px}
+  header,.toolbar,.no-print,.modal-bg,#toast,#gate{display:none !important}
+  main{max-width:none; padding:0}
+  .print-only{display:block}
+  .cards{grid-template-columns:repeat(6,1fr); gap:6px}
+  .kpi{padding:6px 8px} .kpi .val{font-size:15px} .kpi.sel{outline:none}
+  td,th{padding:5px 6px} tr{page-break-inside:avoid}
+  .pill{border:1px solid #999}
+}
 </style>
 </head>
 <body>
@@ -122,6 +135,7 @@ tbody tr.click:hover{background:var(--panel-2)}
     <button class="btn sm" onclick="logout()">Log out</button>
   </header>
   <main>
+    <div class="print-only" id="printHead" style="margin-bottom:10px"></div>
     <div class="cards" id="kpis"></div>
 
     <div class="card toolbar">
@@ -131,7 +145,15 @@ tbody tr.click:hover{background:var(--panel-2)}
         <option value="due">Due in 7 days</option><option value="grace">In grace / overdue</option></select></div>
       <div class="fx"><label>Billing</label><select class="field" id="fCycle" onchange="renderList()"><option value="">All</option><option>Monthly</option><option>Annual</option></select></div>
       <button class="btn ghost" onclick="loadAll()">⟳ Refresh</button>
+      <div class="fx"><label>New sign-ups</label><select class="field" id="fSignup" onchange="renderList()">
+        <option value="">Any time</option><option value="1">Last day</option><option value="7">Last week</option><option value="30">Last month</option></select></div>
+      <div class="fx"><label>Date filter on</label><select class="field" id="fDateOn" onchange="renderList()">
+        <option value="created">Sign-up date</option><option value="expiry">Expiry date</option><option value="login">Last login</option></select></div>
+      <div class="fx" style="min-width:140px"><label>From</label><input class="field" id="fFrom" type="date" onchange="renderList()"></div>
+      <div class="fx" style="min-width:140px"><label>To</label><input class="field" id="fTo" type="date" onchange="renderList()"></div>
+      <button class="btn ghost" onclick="clearFilters()">✕ Clear filters</button>
       <button class="btn ghost" onclick="exportCsv()">⬇ Export CSV</button>
+      <button class="btn ghost" onclick="printReport()">🖨 Print / PDF</button>
       <button class="btn" onclick="openNew()">＋ New client</button>
     </div>
 
@@ -143,7 +165,8 @@ tbody tr.click:hover{background:var(--panel-2)}
         </table>
       </div>
     </div>
-    <p class="tiny" style="margin-top:10px">Rules: max 3 logins per client · access ends 10 days after the expiry date (grace) · overdue Active clients are suspended automatically every night · a <b>Paid</b> payment extends the expiry and re-activates Pending/Suspended clients.</p>
+    <p class="tiny no-print" id="rowCount" style="margin-top:10px"></p>
+    <p class="tiny no-print" style="margin-top:4px">Rules: max 3 logins per client · access ends 10 days after the expiry date (grace) · overdue Active clients are suspended automatically every night · a <b>Paid</b> payment extends the expiry and re-activates Pending/Suspended clients.</p>
   </main>
 </div>
 
@@ -356,6 +379,37 @@ function renderKpis(){
   $('kpis').innerHTML=k.map(([f,l,v])=>`<div class="card kpi ${kpiFilter===f&&f!=='mrr'?'sel':''}" onclick="${f==='mrr'?'':`setKpi('${f}')`}"><div class="lab">${l}</div><div class="val num">${v}</div></div>`).join('');
 }
 function setKpi(f){ kpiFilter=f; $('fStatus').value=f; renderKpis(); renderList(); }
+function localDay(v){ if(!v) return ''; return String(v).length<=10 ? v : iso(new Date(v)); }
+function dateOk(c){
+  const su=Number($('fSignup').value);
+  if(su){ const since=today(); since.setDate(since.getDate()-su+1); if(!c.created_at || new Date(c.created_at)<since) return false; }
+  const fr=$('fFrom').value, to=$('fTo').value;
+  if(fr||to){
+    const on=$('fDateOn').value;
+    const d=localDay(on==='expiry'?c.expiry_date:on==='login'?lastLogin(c):c.created_at);
+    if(!d) return false;
+    if(fr && d<fr) return false;
+    if(to && d>to) return false;
+  }
+  return true;
+}
+function clearFilters(){ ['q','fStatus','fCycle','fSignup','fFrom','fTo'].forEach(i=>$(i).value=''); $('fDateOn').value='created'; renderList(); }
+function filterSummary(){
+  const sel=id=>{ const e=$(id); return e.options[e.selectedIndex].text; }, f=[];
+  if($('q').value.trim()) f.push('Search: "'+$('q').value.trim()+'"');
+  if($('fStatus').value) f.push('Status: '+sel('fStatus'));
+  if($('fCycle').value) f.push('Billing: '+sel('fCycle'));
+  if($('fSignup').value) f.push('New sign-ups: '+sel('fSignup'));
+  if($('fFrom').value||$('fTo').value) f.push(sel('fDateOn')+': '+($('fFrom').value?fmtD($('fFrom').value):'start')+' to '+($('fTo').value?fmtD($('fTo').value):'today'));
+  return f.length?f.join(' · '):'All clients (no filters)';
+}
+function printReport(){
+  const n=filtered().length;
+  $('printHead').innerHTML=`<h2 style="font-size:18px">EZ-Fin · Client Report</h2>
+    <div class="tiny">Printed ${fmtDT(new Date().toISOString())} by ${esc(session&&session.user.email||'')}</div>
+    <div style="margin-top:4px"><b>Filters:</b> ${esc(filterSummary())} · <b>${n}</b> client${n===1?'':'s'}</div>`;
+  window.print();
+}
 function filtered(){
   const q=$('q').value.toLowerCase().trim(), st=$('fStatus').value, cy=$('fCycle').value;
   return clients.filter(c=>{
@@ -364,12 +418,14 @@ function filtered(){
     if(st==='due') return c.status==='Active' && expiryState(c).k==='due';
     if(st==='grace') return ['Active','Cancelled'].includes(c.status) && ['grace','expired'].includes(expiryState(c).k);
     if(st && c.status!==st) return false;
+    if(!dateOk(c)) return false;
     return true;
   });
 }
 function renderList(){
   kpiFilter=$('fStatus').value; renderKpis();
   const rows=filtered();
+  $('rowCount').textContent='Showing '+rows.length+' of '+clients.length+' clients · '+filterSummary();
   if(!rows.length){ $('list').innerHTML=`<tr><td colspan="9"><div class="empty">No clients match.</div></td></tr>`; return; }
   $('list').innerHTML=rows.map(c=>{
     const ex=expiryState(c);
