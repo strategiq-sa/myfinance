@@ -64,6 +64,7 @@ header.top{
 .brand .sub{font-size:12px; color:var(--muted); letter-spacing:.14em; text-transform:uppercase; font-weight:600; margin-top:2px}
 .brand .ttl{font-size:27px; font-weight:800; color:var(--navy); letter-spacing:-.02em; line-height:1.05}
 [data-theme="dark"] .brand .ttl{color:var(--accent)}
+@media (max-width:640px){.brand .ttl{font-size:18px}}
 .spacer{flex:1}
 .hbtn{
   background:var(--panel-2); border:1px solid var(--line); color:var(--text);
@@ -392,9 +393,9 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
   <header class="top">
     <div class="top-row">
       <div class="brand">
-        <div class="logo-chip"><img src="ezfin-logo.png" alt="MyFinances"></div>
+        <div class="logo-chip"><img src="ezfin-logo.png" alt="EZ-Fin"></div>
         <div>
-          <div class="ttl">MyFinances</div>
+          <div class="ttl">Organizing Today - Thriving Tomorrow</div>
           <div class="sub">Income · Expenses · Budgets · Tax</div>
         </div>
       </div>
@@ -738,7 +739,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
       </div>
       <div class="card pad" style="margin-top:16px">
         <h3 style="margin-bottom:4px">Saved statement layouts</h3>
-        <p class="tiny" style="margin-bottom:12px">When you import a bank statement with a new column layout, MyFinances asks you to match the columns and can save that layout here so the same bank imports automatically next time.</p>
+        <p class="tiny" style="margin-bottom:12px">When you import a bank statement with a new column layout, EZ-Fin asks you to match the columns and can save that layout here so the same bank imports automatically next time.</p>
         <div id="mappingsBox" style="display:grid; gap:8px"></div>
       </div>
       <div class="card pad" style="margin-top:16px">
@@ -880,7 +881,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
   <div class="modal" style="max-width:640px">
     <div class="modal-h"><h3>Match your statement columns</h3><button class="x" onclick="closeMap()">×</button></div>
     <div class="modal-b">
-      <p class="tiny">Tell MyFinances which of your file's columns is which — we've guessed where we can. Map <b>either</b> a single <b>Amount</b> column <b>or</b> the separate <b>Money in / Money out</b> columns (whichever your bank uses). Save it and next time this layout imports automatically.</p>
+      <p class="tiny">Tell EZ-Fin which of your file's columns is which — we've guessed where we can. Map <b>either</b> a single <b>Amount</b> column <b>or</b> the separate <b>Money in / Money out</b> columns (whichever your bank uses). Save it and next time this layout imports automatically.</p>
       <div class="map-grid" id="mapGrid"></div>
       <div class="callout" id="mapPreview" style="margin-top:12px"></div>
       <label class="map-save"><input type="checkbox" id="mapSaveChk" checked> Save this layout as <input class="field" id="mapSaveName" placeholder="e.g. Capitec"></label>
@@ -895,8 +896,8 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
 <!-- Login gate (shown when cloud is connected but nobody is logged in) -->
 <div class="gate" id="authGate">
   <div class="gate-card">
-    <div class="gate-logo"><img id="gateLogo" alt="MyFinances"></div>
-    <h2 class="gate-ttl">MyFinances</h2>
+    <div class="gate-logo"><img id="gateLogo" alt="EZ-Fin"></div>
+    <h2 class="gate-ttl">EZ-Fin</h2>
     <p class="gate-sub">Log in to open your data.</p>
     <div id="gateProject" class="tiny gate-proj"></div>
 
@@ -997,7 +998,7 @@ break;case"<bookViews":;case"<bookViews>":;case"</bookViews>":break;case"<workbo
 
 <script>
 /* ============================================================
-   MyFinances — single-file web app
+   EZ-Fin — single-file web app
    Data model: transactions are the source of truth; every other
    screen is a computed view. Expenses stored as money-out (negative
    sign is derived from type, matching the original workbook logic).
@@ -2464,7 +2465,7 @@ function wipeAll(){ if(!confirm('Delete ALL data and start with empty lists? Thi
 
 /* ============================================================
    CLOUD (Supabase) — login + full-data sync
-   Each client's MyFinances data lives in ONE row of the "client_data"
+   Each client's EZ-Fin data lives in ONE row of the "client_data"
    table as JSON, shared by the client's logins (max 3). After login the
    app calls app_check_access(), which applies status / expiry / grace
    rules. Row Level Security blocks data access for anyone else.
@@ -2916,10 +2917,10 @@ function disconnectCloud(){
   setCloud('local'); updateAuthUI(); closeSettings(); toast('Disconnected — using this device');
 }
 
-const SCHEMA_SQL=`-- MyFinances · Supabase setup
+const SCHEMA_SQL=`-- EZ-Fin · Supabase setup
 -- Run this ONCE:  Supabase → SQL Editor → New query → paste all → Run.
 
--- 1) One table holds each person's whole MyFinances data as JSON.
+-- 1) One table holds each person's whole EZ-Fin data as JSON.
 create table if not exists public.app_state (
   user_id    uuid primary key references auth.users(id) on delete cascade,
   state      jsonb not null default '{}'::jsonb,

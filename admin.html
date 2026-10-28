@@ -36,6 +36,11 @@ input,select,textarea{font-family:inherit; font-size:14px}
 .num{font-variant-numeric:tabular-nums}
 header{background:var(--navy); color:#fff; padding:14px 20px; display:flex; align-items:center; gap:14px; flex-wrap:wrap}
 header h1{font-size:18px}
+.logo-chip{background:#fff; border-radius:10px; padding:4px 6px; display:flex; align-items:center}
+.logo-chip img{height:36px; display:block}
+.gate-logo{display:block; height:64px; margin:0 auto 12px}
+.print-logo{height:40px; vertical-align:middle; margin-right:10px}
+
 header .who{margin-left:auto; font-size:13px; opacity:.85}
 header .btn{background:rgba(255,255,255,.12); color:#fff; border-color:rgba(255,255,255,.25)}
 main{max-width:1280px; margin:0 auto; padding:20px 16px 60px}
@@ -118,6 +123,7 @@ tbody tr.click:hover{background:var(--panel-2)}
 <!-- ============ LOGIN ============ -->
 <div class="gate" id="gate">
   <div class="card">
+    <img class="gate-logo" src="ezfin-logo.png" alt="EZ-Fin">
     <h2>EZFin Admin</h2>
     <p class="tiny" style="margin:0 0 16px">Client management. Admin accounts only.</p>
     <div style="margin-bottom:10px"><label>Email</label><input class="field" id="gEmail" type="email" autocomplete="username"></div>
@@ -130,6 +136,7 @@ tbody tr.click:hover{background:var(--panel-2)}
 <!-- ============ APP ============ -->
 <div id="app" class="hide">
   <header>
+    <div class="logo-chip"><img src="ezfin-logo.png" alt="EZ-Fin"></div>
     <h1>EZFin · Client Management</h1>
     <span class="who" id="who"></span>
     <button class="btn sm" onclick="logout()">Log out</button>
@@ -405,7 +412,7 @@ function filterSummary(){
 }
 function printReport(){
   const n=filtered().length;
-  $('printHead').innerHTML=`<h2 style="font-size:18px">EZ-Fin · Client Report</h2>
+  $('printHead').innerHTML=`<h2 style="font-size:18px"><img class="print-logo" src="ezfin-logo.png" alt="">EZ-Fin · Client Report</h2>
     <div class="tiny">Printed ${fmtDT(new Date().toISOString())} by ${esc(session&&session.user.email||'')}</div>
     <div style="margin-top:4px"><b>Filters:</b> ${esc(filterSummary())} · <b>${n}</b> client${n===1?'':'s'}</div>`;
   window.print();
