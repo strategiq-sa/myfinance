@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <script>
-  if (location.protocol !== "https:" && location.hostname !== "localhost") {
+  if (location.protocol === "http:" && location.hostname !== "localhost") {
     location.replace("https://" + location.host + location.pathname + location.search);
   }
 </script>
@@ -19,6 +19,7 @@
   --income:#0f8f61; --income-soft:#e2f4ec;
   --expense:#d83b41; --expense-soft:#fbe4e5;
   --deduction:#cf7d1f; --deduction-soft:#f8ead5;
+  --debt:#7a4fc9; --debt-soft:#ece4fa; --transfer:#3f7f9c; --transfer-soft:#dfeef4;
   --gold:#f4c500;
   --shadow:0 1px 2px rgba(11,46,99,.10), 0 8px 24px rgba(11,46,99,.16);
   --radius:12px; --radius-sm:9px;
@@ -31,6 +32,7 @@
   --income:#2ed6a0; --income-soft:#0f3a30;
   --expense:#ff787d; --expense-soft:#3a1a1d;
   --deduction:#f0b45c; --deduction-soft:#33260f;
+  --debt:#b79bf0; --debt-soft:#2a2140; --transfer:#7cc3df; --transfer-soft:#14303b;
   --gold:#f4c500;
   --shadow:0 1px 2px rgba(0,0,0,.35), 0 12px 30px rgba(0,0,0,.42);
 }
@@ -122,13 +124,13 @@ main{padding:22px; max-width:1220px; width:100%; margin:0 auto; flex:1}
 .btn:disabled{opacity:.5; cursor:not-allowed}
 
 /* KPI waterfall — the signature element */
-.kpi-flow{display:grid; grid-template-columns:repeat(5,1fr); gap:0; margin-bottom:20px}
+.kpi-flow{display:grid; grid-template-columns:repeat(6,1fr); gap:0; margin-bottom:20px}
 .kpi{position:relative; background:var(--panel); border:1px solid var(--line); padding:16px 16px 15px; box-shadow:var(--shadow)}
 .kpi:first-child{border-radius:var(--radius) 0 0 var(--radius)}
 .kpi:last-child{border-radius:0 var(--radius) var(--radius) 0}
 .kpi:not(:last-child){border-right:none}
 .kpi .lab{font-size:11.5px; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); font-weight:700; display:flex; align-items:center; gap:6px}
-.kpi .val{font-size:24px; font-weight:800; margin-top:9px; letter-spacing:-.02em}
+.kpi .val{font-size:clamp(17px,1.55vw,24px); font-weight:800; margin-top:9px; letter-spacing:-.02em; white-space:nowrap}
 .kpi .op{position:absolute; right:-11px; top:50%; transform:translateY(-50%); z-index:2;
   width:22px; height:22px; border-radius:50%; background:var(--panel); border:1px solid var(--line);
   display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px; color:var(--muted)}
@@ -137,6 +139,22 @@ main{padding:22px; max-width:1220px; width:100%; margin:0 auto; flex:1}
 .kpi.deduction .val{color:var(--deduction)} .kpi.deduction .tag{background:var(--deduction)}
 .kpi.expense .val{color:var(--expense)} .kpi.expense .tag{background:var(--expense)}
 .kpi.net .val{color:var(--brand)} .kpi.net .tag{background:var(--brand)}
+.kpi.debt .val{color:var(--debt)} .kpi.debt .tag{background:var(--debt)}
+.moves-h{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin:0 0 10px}
+.moves-h h3{font-size:15px}
+.moves{margin-bottom:20px}
+.move{background:var(--panel); border:1px solid var(--line); border-left:4px solid var(--transfer); border-radius:var(--radius); padding:14px 16px; box-shadow:var(--shadow); min-width:0}
+.move .lab{font-size:11.5px; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); font-weight:700}
+.move .val{font-size:22px; font-weight:800; margin-top:6px; color:var(--transfer); letter-spacing:-.02em}
+.move .sub{font-size:12px; color:var(--muted); margin-top:4px; line-height:1.4}
+.move .warn{font-size:12px; color:var(--deduction); font-weight:700; margin-top:6px; line-height:1.4}
+.acct-set{display:grid; gap:8px; margin-top:12px}
+.acct-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap; border-top:1px solid var(--line); padding-top:8px; font-size:13px}
+.acct-row b{flex:1 1 130px; min-width:0; overflow:hidden; text-overflow:ellipsis}
+.acct-row select{max-width:130px; padding:6px 8px}
+.acct-row label{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted)}
+.st-to{display:flex; align-items:center; gap:4px; margin-top:4px; font-size:11px; color:var(--muted)}
+.test-strip{position:sticky; top:0; z-index:70; background:var(--deduction); color:#fff; text-align:center; font-weight:700; font-size:13px; padding:6px 10px}
 .kpi.surplus .val{color:var(--navy)} [data-theme="dark"] .kpi.surplus .val{color:var(--accent)}
 .kpi.surplus .tag{background:var(--navy)}
 .kpi.surplus.neg .val{color:var(--expense)}
@@ -168,6 +186,8 @@ tr.tot td{font-weight:800; background:var(--accent-soft); border-top:2px solid v
 .pill.income{background:var(--income-soft); color:var(--income)}
 .pill.expense{background:var(--expense-soft); color:var(--expense)}
 .pill.deduction{background:var(--deduction-soft); color:var(--deduction)}
+.pill.debt{background:var(--debt-soft); color:var(--debt)}
+.pill.transfer{background:var(--transfer-soft); color:var(--transfer)}
 .table-wrap{overflow:auto; border-radius:0 0 var(--radius) var(--radius)}
 .table-scroll{max-height:60vh; overflow:auto}
 
@@ -227,6 +247,8 @@ tr.tot td{font-weight:800; background:var(--accent-soft); border-top:2px solid v
 .seg button.on[data-t="Income"]{background:var(--income); color:#fff}
 .seg button.on[data-t="Expense"]{background:var(--expense); color:#fff}
 .seg button.on[data-t="Deduction"]{background:var(--deduction); color:#fff}
+.seg button.on[data-t="Debt Repayment"]{background:var(--debt); color:#fff}
+.seg button.on[data-t="Transfer"]{background:var(--transfer); color:#fff}
 .x{background:none; border:none; font-size:22px; color:var(--muted); line-height:1; padding:2px 6px; border-radius:8px}
 .x:hover{background:var(--panel-2); color:var(--text)}
 
@@ -408,7 +430,6 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
   .card-h{flex-wrap:wrap; padding:12px 14px}
   .kpi-flow{grid-template-columns:1fr 1fr; gap:8px}
   .kpi{border-radius:var(--radius) !important; border-right:1px solid var(--line) !important; padding:12px}
-  .kpi:last-child{grid-column:1 / -1}
   .kpi .op{display:none}
   .kpi .val{font-size:19px}
   .filters{padding:12px; gap:10px}
@@ -425,7 +446,9 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
   .bar-row{grid-template-columns:84px 1fr auto; gap:8px; font-size:12px}
   .month-chart{overflow-x:auto; gap:6px; padding:16px 10px 8px}
   .mc-col{min-width:24px}
-  .mc-bar{width:6px}
+  .mc-bar{width:4px}
+  .mc-bars{gap:1px}
+  .grid>.card{min-width:0}
   table{font-size:12.5px}
   th,td{padding:8px 9px}
   .add-inline{max-width:none}
@@ -488,7 +511,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
           <div class="greeting" id="greeting"></div>
           <div class="eyebrow">Overview</div>
           <h2>Dashboard</h2>
-          <p class="desc">Your money at a glance — income in, deductions and expenses out, and what's left.</p>
+          <p class="desc">Your money at a glance — income in, deductions, expenses and debt repayments out, and what's left.</p>
         </div>
         <div class="no-print"><button class="btn ghost" onclick="window.print()">🖨️ Print</button></div>
       </div>
@@ -503,14 +526,18 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
 
       <div class="kpi-flow" id="kpiFlow"></div>
 
+      <div class="moves-h"><h3>Money moved</h3><span class="tiny">Your own money moving around. Each box says whether it counts as spending.</span></div>
+      <div class="grid g3 moves" id="moveCards"></div>
+
       <div class="grid g2">
         <div class="card">
-          <div class="card-h"><h3>Monthly breakdown</h3><span class="hint">Income vs Expenses vs Deductions</span></div>
+          <div class="card-h"><h3>Monthly breakdown</h3><span class="hint">Income vs Expenses vs Deductions vs Debt</span></div>
           <div class="month-chart" id="monthChart"></div>
           <div class="mini-legend">
             <span><i class="swatch" style="background:var(--income)"></i>Income</span>
             <span><i class="swatch" style="background:var(--expense)"></i>Expenses</span>
             <span><i class="swatch" style="background:var(--deduction)"></i>Deductions</span>
+            <span><i class="swatch" style="background:var(--debt)"></i>Debt</span>
           </div>
         </div>
         <div class="card">
@@ -529,7 +556,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
           <div class="bars" id="dedByCat"></div>
         </div>
         <div class="card">
-          <div class="card-h"><h3>Net by person</h3><span class="hint">Income − deductions − expenses</span></div>
+          <div class="card-h"><h3>Net by person</h3><span class="hint">Income − deductions − expenses − debt</span></div>
           <div class="bars" id="byPerson"></div>
         </div>
       </div>
@@ -554,7 +581,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
       <div id="stagingBanner" class="no-print"></div>
       <div class="filters no-print">
         <div class="fx"><label>Search</label><input class="field" id="txSearch" placeholder="Description, notes…" oninput="renderTxns()" style="min-width:200px"></div>
-        <div class="fx"><label>Type</label><select class="field" id="txType" onchange="renderTxns()"><option>All</option><option>Income</option><option>Expense</option><option>Deduction</option></select></div>
+        <div class="fx"><label>Type</label><select class="field" id="txType" onchange="renderTxns()"><option>All</option><option>Income</option><option>Expense</option><option>Deduction</option><option>Debt Repayment</option><option>Transfer</option></select></div>
         <div class="fx"><label>Allocation</label><select class="field" id="txAlloc" onchange="renderTxns()"></select></div>
         <div class="fx"><label>Account</label><select class="field" id="txAccount" onchange="renderTxns()"></select></div>
         <div class="fx"><label>Person</label><select class="field" id="txPerson" onchange="renderTxns()"></select></div>
@@ -608,7 +635,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
         <div class="fx"><label>Show</label><select class="field" id="stShow" onchange="renderStaging()">
           <option value="all">All</option><option value="need">Needs allocation</option><option value="notyes">Not ticked yet</option><option value="yes">Ticked Yes</option><option value="dup">Possible duplicates</option>
         </select></div>
-        <div class="fx"><label>Type</label><select class="field" id="stType" onchange="stTypeFilterChanged()"><option>All</option><option>Income</option><option>Expense</option><option>Deduction</option></select></div>
+        <div class="fx"><label>Type</label><select class="field" id="stType" onchange="stTypeFilterChanged()"><option>All</option><option>Income</option><option>Expense</option><option>Deduction</option><option>Debt Repayment</option><option>Transfer</option></select></div>
         <div class="fx"><label>Allocation</label><select class="field" id="stAlloc" onchange="renderStaging()"></select></div>
         <div class="flush"><button class="btn ghost sm" onclick="stClearFilters()">Clear filters</button></div>
       </div>
@@ -728,7 +755,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
       <div class="card">
         <div class="card-h"><h3>Your years</h3><span class="hint">Newest first</span></div>
         <div class="table-wrap"><table>
-          <thead><tr><th>Year</th><th>Period</th><th>Status</th><th class="r">Lines</th><th class="r">Income</th><th class="r">Expenses</th><th class="r">Surplus</th><th></th></tr></thead>
+          <thead><tr><th>Year</th><th>Period</th><th>Status</th><th class="r">Lines</th><th class="r">Income</th><th class="r">Expenses + debt</th><th class="r">Cash flow</th><th></th></tr></thead>
           <tbody id="yearsBody"></tbody>
         </table></div>
       </div>
@@ -760,6 +787,20 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
         <div class="chips" id="listExpense"></div>
         <div class="add-inline"><input class="field" id="addExpense" placeholder="Add expense allocation…" style="flex:1"><button class="btn primary sm" onclick="addAlloc('Expense')">Add</button></div>
       </div>
+      <div class="grid g2" style="margin-top:16px">
+        <div class="card pad">
+          <h3 style="margin-bottom:4px">Debt Repayment allocations</h3>
+          <p class="tiny" style="margin-bottom:8px">The capital you pay off a loan. Interest is an Expense.</p>
+          <div class="chips" id="listDebt"></div>
+          <div class="add-inline"><input class="field" id="addDebt" placeholder="Add debt allocation…" style="flex:1"><button class="btn primary sm" onclick="addAlloc('Debt Repayment')">Add</button></div>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-bottom:4px">Transfer allocations</h3>
+          <p class="tiny" style="margin-bottom:8px">Your own money moving. Not income and not an expense.</p>
+          <div class="chips" id="listTransfer"></div>
+          <div class="add-inline"><input class="field" id="addTransfer" placeholder="Add transfer allocation…" style="flex:1"><button class="btn primary sm" onclick="addAlloc('Transfer')">Add</button></div>
+        </div>
+      </div>
       <div class="card pad" style="margin-top:16px">
         <h3 style="margin-bottom:4px">Tax-claimable allocations</h3>
         <p class="tiny" style="margin-bottom:14px">Tick the allocations you can claim against tax. Ticked items and their yearly totals appear on the <b>Tax</b> page.</p>
@@ -770,6 +811,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
           <h3 style="margin-bottom:4px">Accounts <span class="tiny">(Paid from · max 10)</span></h3>
           <div class="chips" id="listAccounts"></div>
           <div class="add-inline"><input class="field" id="addAccount" placeholder="Add account…" style="flex:1"><button class="btn primary sm" onclick="addSimple('accounts','addAccount')">Add</button></div>
+          <div class="acct-set" id="acctSettings"></div>
         </div>
         <div class="card pad">
           <h3 style="margin-bottom:4px">People <span class="tiny">(max 3)</span></h3>
@@ -824,6 +866,8 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
           <button data-t="Income" onclick="pickType('Income')">Income</button>
           <button data-t="Expense" onclick="pickType('Expense')">Expense</button>
           <button data-t="Deduction" onclick="pickType('Deduction')">Deduction</button>
+          <button data-t="Debt Repayment" onclick="pickType('Debt Repayment')">Debt</button>
+          <button data-t="Transfer" onclick="pickType('Transfer')">Transfer</button>
         </div>
       </div>
       <div class="frow"><label>Date</label><input type="date" class="field" id="tDate"></div>
@@ -831,15 +875,18 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
       <div id="singleFields">
         <div class="frow"><label>Amount (<span id="amtCur">R</span>)</label><input type="number" step="0.01" min="0" class="field num" id="tAmount" placeholder="0.00"></div>
         <div class="frow"><label>Description</label><input class="field" id="tDesc" placeholder="Who / what was it for?"></div>
-        <div class="frow"><label>Allocation</label><select class="field" id="tAlloc"></select></div>
+        <div class="frow"><label>Allocation</label><select class="field" id="tAlloc" onchange="tAllocChanged()"></select></div>
+        <div class="frow" id="refundRow" style="display:none"><label style="display:flex; gap:8px; align-items:center"><input type="checkbox" id="tRefund"> This is a refund (money back into my account)</label></div>
+        <div class="frow" id="interestRow" style="display:none"><label>Interest included <span class="tiny">(optional, saved as an Expense)</span></label><input type="number" step="0.01" min="0" class="field num" id="tInterest" placeholder="0.00"></div>
       </div>
 
       <div id="payslipBox" style="display:none"></div>
 
       <div class="frow two">
-        <div class="frow"><label>Paid from</label><select class="field" id="tAccount"></select></div>
+        <div class="frow"><label id="tAccountLbl">Paid from</label><select class="field" id="tAccount"></select></div>
         <div class="frow"><label>Person</label><select class="field" id="tPerson"></select></div>
       </div>
+      <div class="frow" id="toRow" style="display:none"><label>To account</label><select class="field" id="tTo"></select></div>
       <div class="frow"><label>Notes <span class="tiny">(optional)</span></label><input class="field" id="tNotes" placeholder="Anything to remember…"></div>
     </div>
     <div class="modal-f">
@@ -912,6 +959,21 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
   </div>
 </div>
 
+<!-- One-time credit card question -->
+<div class="modal-bg" id="cardModal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-h"><h3>Your credit card payments</h3></div>
+    <div class="modal-b">
+      <p id="cardQText" style="margin-bottom:10px"></p>
+      <p class="tiny"><b>Yes:</b> the purchases count as expenses, so the payment becomes a Transfer and is not counted twice.<br><b>No:</b> the payment stays an Expense, so that spending doesn't disappear.</p>
+    </div>
+    <div class="modal-f" style="flex-wrap:wrap">
+      <button class="btn ghost" onclick="cardAnswer(null)">Ask me later</button>
+      <button class="btn ghost" onclick="cardAnswer(false)">No, not yet</button>
+      <button class="btn primary" onclick="cardAnswer(true)">Yes, I record them</button>
+    </div>
+  </div>
+</div>
 <!-- Bulk edit ticked -->
 <div class="modal-bg" id="bulkModal">
   <div class="modal" style="max-width:460px">
@@ -919,7 +981,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
     <div class="modal-b">
       <p class="tiny" id="bulkCount"></p>
       <p class="tiny">Only the fields you set will change — leave a field on "— keep —" to leave it as is.</p>
-      <div class="frow"><label>Type</label><select class="field" id="bulkType"><option value="">— keep —</option><option>Income</option><option>Expense</option><option>Deduction</option></select></div>
+      <div class="frow"><label>Type</label><select class="field" id="bulkType"><option value="">— keep —</option><option>Income</option><option>Expense</option><option>Deduction</option><option>Debt Repayment</option><option>Transfer</option></select></div>
       <div class="frow"><label>Allocation</label><select class="field" id="bulkAlloc"></select></div>
       <div class="frow two">
         <div class="frow"><label>Account</label><select class="field" id="bulkAccount"></select></div>
@@ -1060,7 +1122,9 @@ break;case"<bookViews":;case"<bookViews>":;case"</bookViews>":break;case"<workbo
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const FY = ['Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb']; // SA financial year
-const TYPES = ['Income','Expense','Deduction'];
+const TYPES = ['Income','Expense','Deduction','Debt Repayment','Transfer'];
+const SCHEMA = 2;
+const CARD_PAY = 'Credit card payment';
 const CUR = 'R';
 const CURRENCIES=[
   {code:'ZAR',symbol:'R'},{code:'USD',symbol:'$'},{code:'EUR',symbol:'€'},{code:'GBP',symbol:'£'},
@@ -1074,11 +1138,13 @@ const DEFAULT_LISTS = {
   allocations: {
     Income: ['Salary','Side Hustle','Interest','Investment','Bonus','Commission'],
     Deduction: ['Tax','Medical aid','UIF','SDL','Provident','Pension'],
-    Expense: ['Assurance','Bank Fees','Cell / Phone','Credit card payment','Entertainment','Fuel','Gifts',
-      'Groceries & Cleaning','Insurance','Internet','Loan','Medical aid','Medical expenses','Medical Other',
-      'Miscellaneous','Pension','Rent','Retirement Annuity','School fees','Tax free saving','Utilities',
-      'Vehicle finance','Vehicle repairs','Travel (Local)','Travel (International)','Storage','Domestic Worker',
-      'Toll Fees','Clothing and Accessories','Subscriptions','Parking']
+    Expense: ['Assurance','Bank Fees','Cash spending','Cell / Phone','Credit card interest & fees','Credit card payment','Entertainment','Fuel','Gifts',
+      'Groceries & Cleaning','Insurance','Internet','Loan interest','Medical aid','Medical expenses','Medical Other',
+      'Miscellaneous','Pension','Rent','Retirement Annuity','School fees','Utilities',
+      'Vehicle repairs','Travel (Local)','Travel (International)','Storage','Domestic Worker',
+      'Toll Fees','Clothing and Accessories','Subscriptions','Parking'],
+    'Debt Repayment': ['Home loan','Loan','Personal loan','Vehicle finance'],
+    Transfer: ['Account to account','Cash withdrawal','Credit card payment','Tax free saving']
   },
   accounts: ['Cash','Capitec Bank','Discovery Bank'],
   persons: ['Clint','Ann'],
@@ -1099,7 +1165,7 @@ const LS = 'pfm_state_v1';
 function blankState(){
   return { transactions:[], lists:JSON.parse(JSON.stringify(DEFAULT_LISTS)), budgets:{},
            settings:{ supaUrl:'', supaKey:'', userName:(DEFAULT_LISTS.persons[0]||''), currency:{code:'ZAR',symbol:'R'} },
-           archived:[], years:{} };
+           archived:[], years:{}, schema:SCHEMA };
 }
 function save(){
   if(typeof subReadOnly==='function' && subReadOnly() && cloudOn()){
@@ -1129,7 +1195,7 @@ function maskAllAccounts(){
     state.lists.accounts.forEach(a=>{ const m=maskAcct(a); if(m && !seen.has(m.toLowerCase())){ seen.add(m.toLowerCase()); out.push(m); } });
     state.lists.accounts=out;
   }
-  (state.transactions||[]).forEach(t=>{ if(t.account) t.account=maskAcct(t.account); });
+  (state.transactions||[]).forEach(t=>{ if(t.account) t.account=maskAcct(t.account); if(t.toAccount) t.toAccount=maskAcct(t.toAccount); });
   (state.archived||[]).forEach(t=>{ if(t.account) t.account=maskAcct(t.account); });
   (state.staging||[]).forEach(t=>{ if(t.account) t.account=maskAcct(t.account); });
 }
@@ -1149,8 +1215,40 @@ function normalizeState(){
   if(Array.isArray(state.lists.claimable)){
     const o={}; state.lists.claimable.forEach(k=>o[k]=100); state.lists.claimable=o;
   }
+  if(!state.lists.accountInfo || typeof state.lists.accountInfo!=='object') state.lists.accountInfo = {};
   maskAllAccounts();
   ensureYears();
+  migrateV2();
+}
+/* Version 2 data: adds the Debt Repayment and Transfer types. Closed years are never touched.
+   Credit card payments are NOT moved here: that depends on the person's answer (see cardAnswer). */
+function migrateV2(){
+  if((state.schema||1)>=SCHEMA) return;
+  try{ if(!localStorage.getItem('pfm_backup_v1')) localStorage.setItem('pfm_backup_v1',JSON.stringify(state)); }catch(e){}
+  const L=state.lists.allocations;
+  const has=(list,a)=>list.some(x=>x.toLowerCase()===a.toLowerCase());
+  const debtRe=/^(loan|vehicle finance|home loan|bond|personal loan|student loan)$/i, tfsRe=/tax.?free|tfsa/i;
+  const moved=(L.Expense||[]).filter(a=>debtRe.test(a)||tfsRe.test(a));
+  L['Debt Repayment']=moved.filter(a=>debtRe.test(a)); L.Transfer=moved.filter(a=>tfsRe.test(a));
+  L.Expense=(L.Expense||[]).filter(a=>!moved.includes(a));
+  DEFAULT_LISTS.allocations['Debt Repayment'].forEach(a=>{ if(!has(L['Debt Repayment'],a)) L['Debt Repayment'].push(a); });
+  DEFAULT_LISTS.allocations.Transfer.forEach(a=>{ if(!has(L.Transfer,a)) L.Transfer.push(a); });
+  ['Cash spending','Credit card interest & fees','Loan interest',CARD_PAY].forEach(a=>{ if(!has(L.Expense,a)) L.Expense.push(a); });
+  const newType=a=>debtRe.test(a)?'Debt Repayment':tfsRe.test(a)?'Transfer':null;
+  const conv=t=>{ if(t.type!=='Expense') return; const n=newType(t.allocation||''); if(n) t.type=n; };
+  const notClosed=d=>yearStatus(fyStartOf(d))!=='closed';
+  (state.transactions||[]).concat(state.archived||[]).forEach(t=>{ if(notClosed(t.date)) conv(t); });
+  (state.staging||[]).forEach(conv);
+  const nb={};
+  Object.keys(state.budgets||{}).forEach(k=>{
+    const p=k.split('|');
+    if(p.length===4 && p[1]==='Expense' && yearStatus(p[0])!=='closed'){ const n=newType(p[2]); if(n) p[1]=n; }
+    nb[p.join('|')]=state.budgets[k];
+  });
+  state.budgets=nb;
+  const cm=state.lists.claimable||{};
+  Object.keys(cm).forEach(k=>{ const [ty,a]=k.split('::'); const n=ty==='Expense'&&newType(a||''); if(n) cm[n+'::'+a]=cm[k]; });
+  state.schema=SCHEMA;
 }
 
 /* ---------- sample data (opens populated) ---------- */
@@ -1183,6 +1281,10 @@ function seedSample(){
     mk(3,6,'Groceries','Expense','Groceries & Cleaning',3600,'Discovery Bank','Ann'),
     mk(3,11,'Petrol','Expense','Fuel',1180,'Discovery Bank','Clint'),
     mk(3,16,'Quarterly bonus','Income','Bonus',15000,'Capitec Bank','Clint'),
+    mk(3,2,'Vehicle finance','Debt Repayment','Vehicle finance',3500,'Capitec Bank','Clint'),
+    {...mk(3,26,'Transfer to savings','Transfer','Account to account',2000,'Capitec Bank','Clint'),toAccount:'Discovery Bank'},
+    mk(3,27,'Credit card payment','Transfer',CARD_PAY,5000,'Capitec Bank','Clint'),
+    mk(3,28,'Tax-free savings','Transfer','Tax free saving',1500,'Capitec Bank','Clint'),
   ];
   state.transactions = S;
 }
@@ -1239,10 +1341,8 @@ function ensureYears(){
 }
 function yearTotals(y){
   const r=yearTxns(y);
-  const inc=sum(r.filter(t=>t.type==='Income').map(t=>Math.abs(t.amount)));
-  const ded=sum(r.filter(t=>t.type==='Deduction').map(t=>Math.abs(t.amount)));
-  const exp=sum(r.filter(t=>t.type==='Expense').map(t=>Math.abs(t.amount)));
-  return {n:r.length, inc, ded, exp, net:inc-ded, surplus:inc-ded-exp};
+  const inc=sumType(r,'Income'), ded=sumType(r,'Deduction'), exp=sumType(r,'Expense'), debt=sumType(r,'Debt Repayment');
+  return {n:r.length, inc, ded, exp, debt, net:inc-ded, surplus:inc-ded-exp-debt};
 }
 function fillYearSel(){
   const el=document.getElementById('yearSel'); if(!el) return;
@@ -1276,7 +1376,7 @@ function renderYears(){
       <td><span class="ystat ${st}">${st==='open'?'Open':'Closed'}</span></td>
       <td class="r num">${t.n}</td>
       <td class="r num">${fmt0(t.inc)}</td>
-      <td class="r num">${fmt0(t.exp)}</td>
+      <td class="r num">${fmt0(t.exp+t.debt)}</td>
       <td class="r num ${t.surplus<0?'neg':'pos'}">${fmt0(t.surplus)}</td>
       <td style="white-space:nowrap">${y===activeYear()?'':`<button class="btn ghost sm" onclick="setActiveYear(${y}); toast('Now viewing ${fyLabel(y)}')">Switch to</button>`}
         <button class="btn ghost sm" onclick="exportCsv(${y})">CSV</button> ${act}</td>
@@ -1334,7 +1434,29 @@ function closeYear(y){
 /* ---------- helpers ---------- */
 function uid(){ return 't_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 function monthOf(d){ const dt=new Date(d+'T00:00:00'); return isNaN(dt)?'':MONTHS[dt.getMonth()]; }
-function signed(t){ return t.type==='Expense' ? -Math.abs(t.amount) : Math.abs(t.amount); }
+function isRefund(t){ return t.type==='Expense' && t.refund===true; }
+// Amount for totals of its own type: a refund reduces its expense
+function netAmt(t){ return isRefund(t) ? -Math.abs(t.amount) : Math.abs(t.amount); }
+function sumType(rows,type){ return sum(rows.filter(t=>t.type===type).map(netAmt)); }
+// Amount as shown on a line: money out is negative. Transfers show as moved (no sign).
+function signed(t){
+  if(t.type==='Transfer'||t.type==='Income'||isRefund(t)) return Math.abs(t.amount);
+  return -Math.abs(t.amount);
+}
+// Effect on the household's money: a transfer between own accounts is nil
+function netEffect(t){ return t.type==='Transfer' ? 0 : signed(t); }
+function amtCls(t){ return t.type==='Transfer' ? '' : (signed(t)<0?'neg':'pos'); }
+function isCardPay(t){ return String(t.allocation||'').trim().toLowerCase()===CARD_PAY.toLowerCase() && (t.type==='Transfer'||t.type==='Expense'); }
+function isTfs(t){ return /tax.?free|tfsa/i.test(t.allocation||'') && (t.type==='Transfer'||t.type==='Expense'); }
+/* Account settings: what kind of account, and are its purchases recorded in the app? */
+function acctInfo(name){
+  const i=(state.lists.accountInfo||{})[name];
+  if(i) return i;
+  const kind=/credit|\bcc\b|\/cre\//i.test(name||'')?'Credit card':/cash/i.test(name||'')?'Cash':'Bank';
+  return {kind, track:false};
+}
+function setAcctInfo(name,patch){ state.lists.accountInfo[name]={...acctInfo(name),...patch}; }
+function trackedAcct(kind){ return state.lists.accounts.find(a=>{ const i=acctInfo(a); return i.kind===kind&&i.track; })||''; }
 function group(intStr){ return intStr.replace(/\B(?=(\d{3})+(?!\d))/g,' '); } // space thousands
 function fmt(n){
   const neg=n<0, a=Math.abs(Number(n)||0);
@@ -1368,14 +1490,14 @@ document.getElementById('nav').addEventListener('click', e=>{
 function dashFiltered(){
   const a=val('fAlloc'), b=val('fBank'), p=val('fPerson'), m=val('fMonth');
   return yearTxns().filter(t=>
-    (a==='All'||t.allocation===a) && (b==='All'||t.account===b) &&
+    (a==='All'||t.allocation===a) && (b==='All'||t.account===b||t.toAccount===b) &&
     (p==='All'||t.person===p) && (m==='All'||monthOf(t.date)===m));
 }
 function val(id){ const el=document.getElementById(id); return el?el.value:'All'; }
 function resetFilters(){ ['fAlloc','fBank','fPerson','fMonth'].forEach(id=>{const e=document.getElementById(id); if(e) e.value='All';}); renderDashboard(); }
 
 /* ---------- populate all dropdowns ---------- */
-function allAllocations(){ return [...state.lists.allocations.Income, ...state.lists.allocations.Deduction, ...state.lists.allocations.Expense]; }
+function allAllocations(){ const L=state.lists.allocations; return [...new Set(['Income','Deduction','Expense','Debt Repayment','Transfer'].flatMap(k=>L[k]||[]))]; }
 function fillSelect(id, items, withAll){
   const el=document.getElementById(id); if(!el) return; const cur=el.value;
   el.innerHTML = (withAll?'<option>All</option>':'') + items.map(i=>`<option>${esc(i)}</option>`).join('');
@@ -1392,6 +1514,8 @@ function refreshDropdowns(){
   fillSelect('txAlloc', allAllocations(), true);
   fillSelect('txAccount', state.lists.accounts, true);
   fillSelect('tAccount', state.lists.accounts, false);
+  const tt=document.getElementById('tTo');
+  if(tt){ const c=tt.value; tt.innerHTML='<option value="">— not in EZ-Fin —</option>'+state.lists.accounts.map(i=>`<option>${esc(i)}</option>`).join(''); if([...tt.options].some(o=>o.value===c)) tt.value=c; }
   fillSelect('tPerson', state.lists.persons, false);
   fillSelect('repPerson', ['All',...state.lists.persons], false);
   fillSelect('taxPerson', ['All',...state.lists.persons], false);
@@ -1411,18 +1535,20 @@ function renderGreeting(){
 function renderDashboard(){
   renderGreeting();
   const rows = dashFiltered();
-  const gross = sum(rows.filter(t=>t.type==='Income').map(t=>Math.abs(t.amount)));
-  const ded   = sum(rows.filter(t=>t.type==='Deduction').map(t=>Math.abs(t.amount)));
-  const exp   = sum(rows.filter(t=>t.type==='Expense').map(t=>Math.abs(t.amount)));
+  const gross = sumType(rows,'Income');
+  const ded   = sumType(rows,'Deduction');
+  const exp   = sumType(rows,'Expense');
+  const debt  = sumType(rows,'Debt Repayment');
   const net   = gross - ded;
-  const surplus = net - exp;
+  const surplus = net - exp - debt;
 
   const flow=[
     {c:'income',   lab:'Gross income', v:gross, op:'−'},
     {c:'deduction',lab:'Deductions',   v:ded,   op:'='},
     {c:'net',      lab:'Net income',   v:net,   op:'−'},
-    {c:'expense',  lab:'Expenses',     v:exp,   op:'='},
-    {c:'surplus',  lab:'Surplus / (deficit)', v:surplus, op:''}
+    {c:'expense',  lab:'Expenses',     v:exp,   op:'−'},
+    {c:'debt',     lab:'Debt repayments', v:debt, op:'='},
+    {c:'surplus',  lab:'Cash flow',    v:surplus, op:''}
   ];
   document.getElementById('kpiFlow').innerHTML = flow.map(k=>`
     <div class="kpi ${k.c} ${k.c==='surplus'&&k.v<0?'neg':''}">
@@ -1431,20 +1557,21 @@ function renderDashboard(){
       ${k.op?`<div class="op">${k.op}</div>`:''}
     </div>`).join('');
 
+  renderMoves(rows);
+
   // monthly grouped chart (financial year order, Mar–Feb)
   const byM = FY.map(m=>{
     const r=rows.filter(t=>monthOf(t.date)===m);
-    return { m, inc:sum(r.filter(t=>t.type==='Income').map(t=>t.amount)),
-             exp:sum(r.filter(t=>t.type==='Expense').map(t=>t.amount)),
-             ded:sum(r.filter(t=>t.type==='Deduction').map(t=>t.amount)) };
+    return { m, inc:sumType(r,'Income'), exp:sumType(r,'Expense'), ded:sumType(r,'Deduction'), debt:sumType(r,'Debt Repayment') };
   });
-  const mx = Math.max(1, ...byM.map(x=>Math.max(x.inc,x.exp,x.ded)));
+  const mx = Math.max(1, ...byM.map(x=>Math.max(x.inc,x.exp,x.ded,x.debt)));
   document.getElementById('monthChart').innerHTML = byM.map(x=>`
-    <div class="mc-col" title="${x.m}: in ${fmt0(x.inc)} · out ${fmt0(x.exp)} · ded ${fmt0(x.ded)}">
+    <div class="mc-col" title="${x.m}: in ${fmt0(x.inc)} · out ${fmt0(x.exp)} · ded ${fmt0(x.ded)} · debt ${fmt0(x.debt)}">
       <div class="mc-bars">
         <div class="mc-bar" style="height:${x.inc/mx*100}%; background:var(--income)"></div>
         <div class="mc-bar" style="height:${x.exp/mx*100}%; background:var(--expense)"></div>
         <div class="mc-bar" style="height:${x.ded/mx*100}%; background:var(--deduction)"></div>
+        <div class="mc-bar" style="height:${x.debt/mx*100}%; background:var(--debt)"></div>
       </div>
       <div class="mc-lab">${x.m}</div>
     </div>`).join('');
@@ -1456,17 +1583,36 @@ function renderDashboard(){
   // net by person
   const per = state.lists.persons.map(p=>{
     const r=rows.filter(t=>t.person===p);
-    const v = sum(r.filter(t=>t.type==='Income').map(t=>t.amount))
-            - sum(r.filter(t=>t.type==='Deduction').map(t=>t.amount))
-            - sum(r.filter(t=>t.type==='Expense').map(t=>t.amount));
+    const v = sumType(r,'Income') - sumType(r,'Deduction') - sumType(r,'Expense') - sumType(r,'Debt Repayment');
     return {nm:p, v};
   });
   barList('byPerson', per, 'var(--brand)');
 }
+/* The three "Money moved" figures on the Dashboard */
+function renderMoves(rows){
+  const card=rows.filter(isCardPay), tfs=rows.filter(isTfs);
+  const a2a=rows.filter(t=>t.type==='Transfer' && !isCardPay(t) && !isTfs(t));
+  const cardT=sum(card.filter(t=>t.type==='Transfer').map(netAmt)), cardE=sumType(card,'Expense');
+  const tfsE=sumType(tfs,'Expense');
+  let cardSub='No credit card payments in this view.';
+  if(cardT&&cardE) cardSub=`${fmt0(cardE)} is counted in Expenses, the rest is not.`;
+  else if(cardE) cardSub="Counted in Expenses, because your card purchases aren't recorded.";
+  else if(cardT) cardSub='Not counted as spending. Your card purchases are counted instead.';
+  let warn='';
+  if(cardT && val('fAlloc')==='All' && val('fBank')==='All' && trackedAcct('Credit card')){
+    const bought=rows.some(t=>t.type==='Expense' && acctInfo(t.account).kind==='Credit card');
+    if(!bought) warn='⚠ No card purchases recorded for this period. Import your card statement or this spending is missing.';
+  }
+  const tile=(lab,v,sub,w)=>`<div class="move"><div class="lab">${lab}</div><div class="val num">${fmt0(v)}</div><div class="sub">${sub}</div>${w?`<div class="warn">${w}</div>`:''}</div>`;
+  document.getElementById('moveCards').innerHTML=
+    tile('Credit card payments',cardT+cardE,cardSub,warn)+
+    tile('Account to account transfers',sum(a2a.map(netAmt)),'Not counted as income or spending.')+
+    tile('Tax free savings',sum(tfs.map(netAmt)),tfsE?'Counted in Expenses for this closed year.':'Your own savings, so not counted as spending.');
+}
 function sum(a){ return a.reduce((s,x)=>s+(Number(x)||0),0); }
 function catBars(id, rows, color, top){
-  const map={}; rows.forEach(t=>{ map[t.allocation]=(map[t.allocation]||0)+Math.abs(t.amount); });
-  let list=Object.entries(map).map(([nm,v])=>({nm,v})).sort((a,b)=>b.v-a.v).slice(0,top);
+  const map={}; rows.forEach(t=>{ map[t.allocation]=(map[t.allocation]||0)+netAmt(t); });
+  let list=Object.entries(map).map(([nm,v])=>({nm,v})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v).slice(0,top);
   barList(id, list, color);
 }
 function barList(id, list, color){
@@ -1490,7 +1636,7 @@ function renderTxns(){
   const ro=activeYearClosed();
   let rows=yearTxns().filter(t=>
     (ty==='All'||t.type===ty)&&(pe==='All'||t.person===pe)&&(mo==='All'||monthOf(t.date)===mo)&&
-    (al==='All'||t.allocation===al)&&(ac==='All'||t.account===ac)&&
+    (al==='All'||t.allocation===al)&&(ac==='All'||t.account===ac||t.toAccount===ac)&&
     (!q||(t.description||'').toLowerCase().includes(q)||(t.notes||'').toLowerCase().includes(q)||(t.allocation||'').toLowerCase().includes(q)));
   rows.sort((a,b)=> (a.date<b.date?1:a.date>b.date?-1:0));
   const body=document.getElementById('txBody');
@@ -1503,10 +1649,10 @@ function renderTxns(){
         <td class="no-print">${ro?'🔒':`<input type="checkbox" class="tick" data-id="${t.id}" onchange="tickChanged()">`}</td>
         <td class="num">${t.date}</td>
         <td>${esc(t.description||'')}${t.notes?`<div class="tiny">${esc(t.notes)}</div>`:''}</td>
-        <td><span class="pill ${t.type.toLowerCase()}">${t.type}</span></td>
+        <td><span class="pill ${t.type.toLowerCase()}">${t.type}</span>${isRefund(t)?' <span class="tiny">↩ Refund</span>':''}</td>
         <td>${esc(t.allocation||'')}</td>
-        <td class="r num ${s<0?'neg':'pos'}">${fmt(s)}</td>
-        <td>${esc(maskAcct(t.account||''))}</td>
+        <td class="r num ${amtCls(t)}">${fmt(s)}</td>
+        <td>${esc(maskAcct(t.account||''))}${t.toAccount?` → ${esc(maskAcct(t.toAccount))}`:''}</td>
         <td>${esc(t.person||'')}</td>
         <td>${monthOf(t.date)}</td>
         <td class="no-print">${ro?'':`<button class="btn ghost sm" onclick="openTxn('${t.id}')">Edit</button>`}</td>
@@ -1514,7 +1660,7 @@ function renderTxns(){
     }).join('');
   }
   document.getElementById('txCount').textContent = `${rows.length} transaction${rows.length!==1?'s':''} · ${fyLabel(activeYear())}${ro?' 🔒':''}`;
-  const tot=sum(rows.map(signed));
+  const tot=sum(rows.map(netEffect));
   document.getElementById('txTotal').innerHTML = `Net shown: <b class="num" style="color:${tot<0?'var(--expense)':'var(--income)'}">${fmt(tot)}</b>`;
   document.getElementById('tickAll').checked=false;
   tickChanged();
@@ -1571,7 +1717,7 @@ function renderArchive(){
     <td>${esc(t.description||'')}</td>
     <td><span class="pill ${t.type.toLowerCase()}">${t.type}</span></td>
     <td>${esc(t.allocation||'')}</td>
-    <td class="r num ${signed(t)<0?'neg':'pos'}">${fmt(signed(t))}</td>
+    <td class="r num ${amtCls(t)}">${fmt(signed(t))}</td>
     <td>${esc(t._reason||'')}<div class="tiny">${(t._archivedAt||'').slice(0,10)}</div></td>
     <td style="white-space:nowrap"><button class="btn ghost sm" onclick="restoreArchived('${t.id}')">Restore</button> <button class="btn danger sm" onclick="purgeArchived('${t.id}')">Delete</button></td>
   </tr>`).join('');
@@ -1664,6 +1810,8 @@ function openTxn(id){
   const t = id ? state.transactions.find(x=>x.id===id) : null;
   pendingType = t? t.type : 'Expense';
   _openAlloc = t? t.allocation : null;
+  document.getElementById('tRefund').checked = !!(t&&t.refund);
+  document.getElementById('tInterest').value = '';
   paintTypeSeg();
   const _ay=activeYear(), _td=todayISO();
   let _def=_td;   // default date: today, or the nearest day inside the open year being viewed
@@ -1676,6 +1824,8 @@ function openTxn(id){
   updateTxnMode();
   document.getElementById('tAccount').value = t? t.account : state.lists.accounts[0];
   document.getElementById('tPerson').value = t? t.person : state.lists.persons[0];
+  document.getElementById('tTo').value = (t&&t.toAccount)||'';
+  tAllocChanged();
   document.getElementById('txnModal').classList.add('show');
 }
 function closeTxn(){ document.getElementById('txnModal').classList.remove('show'); }
@@ -1688,8 +1838,20 @@ function updateTxnMode(){
   const ac=document.getElementById('amtCur'); if(ac) ac.textContent=curSym();
   document.getElementById('singleFields').style.display = ps?'none':'';
   document.getElementById('payslipBox').style.display   = ps?'':'none';
+  document.getElementById('refundRow').style.display = pendingType==='Expense'?'':'none';
+  document.getElementById('interestRow').style.display = (pendingType==='Debt Repayment'&&!editingId)?'':'none';
+  document.getElementById('toRow').style.display = pendingType==='Transfer'?'':'none';
+  document.getElementById('tAccountLbl').textContent = pendingType==='Transfer'?'From account':'Paid from';
   document.getElementById('txnTitle').textContent = editingId?'Edit transaction':(ps?'New income / payslip':'New transaction');
-  if(ps) buildPayslip(); else fillAlloc(_openAlloc);
+  if(ps) buildPayslip(); else { fillAlloc(_openAlloc); if(typeof tAllocChanged==='function') tAllocChanged(); }
+}
+// Paying a card or drawing cash: point the transfer at that account
+function tAllocChanged(){
+  if(pendingType!=='Transfer') return;
+  const to=document.getElementById('tTo'), a=(document.getElementById('tAlloc').value||'').toLowerCase();
+  if(to.value) return;
+  const kind=a===CARD_PAY.toLowerCase()?'Credit card':a==='cash withdrawal'?'Cash':'';
+  if(kind) to.value=state.lists.accounts.find(x=>acctInfo(x).kind===kind)||'';
 }
 function fillAlloc(sel){
   const el=document.getElementById('tAlloc');
@@ -1742,13 +1904,25 @@ function saveTxn(){
   if(!dateEditable(date)){ toast(dateBlockMsg(date),true); return; }
   if(editingId){ const old=state.transactions.find(t=>t.id===editingId); if(old && !dateEditable(old.date)){ toast(dateBlockMsg(old.date),true); return; } }
   if(amt<=0){ toast('Enter an amount greater than 0',true); return; }
+  const toAcct=pendingType==='Transfer'?document.getElementById('tTo').value:'';
+  if(toAcct && toAcct===document.getElementById('tAccount').value){ toast('The From and To accounts must be different',true); return; }
+  const interest=(pendingType==='Debt Repayment'&&!editingId)?(Number(document.getElementById('tInterest').value)||0):0;
+  if(interest<0||interest>amt){ toast('The interest must be between 0 and the amount',true); return; }
   const rec={
     id: editingId||uid(),
     date, description:document.getElementById('tDesc').value.trim(),
     type:pendingType, allocation:document.getElementById('tAlloc').value,
-    amount:Math.abs(amt), account:document.getElementById('tAccount').value,
+    amount:Math.round((Math.abs(amt)-interest)*100)/100, account:document.getElementById('tAccount').value,
     person:document.getElementById('tPerson').value, notes:document.getElementById('tNotes').value.trim()
   };
+  if(toAcct) rec.toAccount=toAcct;
+  if(pendingType==='Expense'&&document.getElementById('tRefund').checked) rec.refund=true;
+  if(interest>0){
+    const L=state.lists.allocations.Expense; if(!L.includes('Loan interest')) L.push('Loan interest');
+    state.transactions.push({ id:uid(), date, description:rec.description?rec.description+' (interest)':'Loan interest', type:'Expense',
+      allocation:'Loan interest', amount:interest, account:rec.account, person:rec.person, notes:rec.notes });
+  }
+  if(rec.amount<=0) { save(); closeTxn(); render(); toast('Interest saved'); return; }
   if(editingId){ const i=state.transactions.findIndex(t=>t.id===editingId); state.transactions[i]=rec; }
   else state.transactions.push(rec);
   save(); closeTxn(); render();
@@ -1760,7 +1934,7 @@ function exportCsv(y){
   if(y===undefined||y===null||typeof y==='object') y=activeYear();
   const head=['Date','Description','Type','Allocation','Amount','Account','Person','Month','Notes'];
   const lines=[head.join(',')].concat(yearTxns(y).map(t=>
-    [t.date,q(t.description),t.type,q(t.allocation),signed(t),q(t.account),q(t.person),monthOf(t.date),q(t.notes)].join(',')));
+    [t.date,q(t.description),isRefund(t)?'Expense refund':t.type,q(t.allocation),signed(t),q(t.account),q(t.person),monthOf(t.date),q(t.notes)].join(',')));
   dl(`ezfin-transactions-${fyLabel(y).replace('/','-')}.csv`, lines.join('\n'));
   function q(s){ s=(s==null?'':String(s)); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }
 }
@@ -1797,6 +1971,11 @@ function parseCsv(text){ importRows(csvRows(text)); }
    Understands the app's own export AND typical bank-statement layouts
    (Money In / Money Out / Fee, or Debit / Credit). */
 function importRows(rows){ beginTabularImport(rows); }
+function parseType(v){
+  const s=String(v||'').trim().toLowerCase();
+  if(s==='expense refund'||s==='refund') return {type:'Expense',refund:true};
+  return {type:TYPES.find(t=>t.toLowerCase()===s)||'Expense',refund:false};
+}
 function _num(x){ x=String(x==null?'':x).replace(/[^0-9.\-]/g,''); const n=parseFloat(x); return isNaN(n)?0:n; }
 
 /* Decide how to import a header+rows table:
@@ -1843,7 +2022,7 @@ function applyMapping(rows,m){
   const out=[];
   for(let i=1;i<rows.length;i++){
     const r=rows[i]||[]; if(!r.length||r.every(x=>!String(x==null?'':x).trim())) continue;
-    let type, amount;
+    let type, amount, refund=false;
     if(split){
       let signed=0;
       if(jIn>=0) signed+=Math.abs(_num(g(r,jIn)));
@@ -1853,11 +2032,11 @@ function applyMapping(rows,m){
       type=signed>=0?'Income':'Expense'; amount=Math.abs(signed);
     }else{
       const a=_num(g(r,jAmount));
-      if(jType>=0){ type=g(r,jType)||'Expense'; type=TYPES.find(t=>t.toLowerCase()===type.toLowerCase())||'Expense'; amount=Math.abs(a); }
+      if(jType>=0){ const pt=parseType(g(r,jType)); type=pt.type; refund=pt.refund; amount=Math.abs(a); }
       else { type=a>=0?'Income':'Expense'; amount=Math.abs(a); }
     }
     out.push({ date:isoDate(g(r,jDate).split(' ')[0]), description:g(r,jDesc), type,
-               allocation:g(r,jAlloc), amount, account:g(r,jAcct), person:g(r,jPerson), notes:g(r,jNotes) });
+               allocation:g(r,jAlloc), amount, account:g(r,jAcct), person:g(r,jPerson), notes:g(r,jNotes), refund });
   }
   return out;
 }
@@ -1882,7 +2061,7 @@ function rowsToTxns(rows){
   for(let i=1;i<rows.length;i++){
     const r=rows[i]||[]; if(!r.length||r.every(c=>!String(c==null?'':c).trim())) continue;
     const date=isoDate(g(r,jDate).split(' ')[0]);
-    let type, amount;
+    let type, amount, refund=false;
     if(bankMode){
       let signed=0;
       if(jIn>=0)  signed+=Math.abs(_num(g(r,jIn)));
@@ -1891,13 +2070,13 @@ function rowsToTxns(rows){
       if(signed===0) continue;                 // skip balance-only / info rows
       type = signed>=0 ? 'Income' : 'Expense'; amount=Math.abs(signed);
     } else if(jType>=0){
-      type=g(r,jType)||'Expense'; type=TYPES.find(t=>t.toLowerCase()===type.toLowerCase())||'Expense';
+      const pt=parseType(g(r,jType)); type=pt.type; refund=pt.refund;
       amount=Math.abs(_num(g(r,jAmount)));
     } else {
       const a=_num(g(r,jAmount)); type=a>=0?'Income':'Expense'; amount=Math.abs(a);
     }
     out.push({ date, description:g(r,jDesc), type, allocation:g(r,jAlloc),
-               amount, account:g(r,jAcct), person:g(r,jPerson), notes:g(r,jNotes) });
+               amount, account:g(r,jAcct), person:g(r,jPerson), notes:g(r,jNotes), refund });
   }
   return out;
 }
@@ -1963,6 +2142,30 @@ function isoDate(s){
   if(m){ let y=m[3]; if(y.length===2) y='20'+y; return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`; }
   const dt=new Date(s); return isNaN(dt)?s:dt.toISOString().slice(0,10);
 }
+/* Bank wording that tells us what a line is. Only a suggestion: the person checks it before moving it. */
+function autoRule(desc,dir,acct){
+  const s=String(desc||'').toLowerCase(), kind=acctInfo(acct||'').kind;
+  if(kind==='Credit card'){
+    if(dir==='in'){
+      if(/refund|reversal|cash ?back/.test(s)) return {type:'Expense',allocation:'',first:true};
+      return {type:'Transfer',allocation:CARD_PAY,first:true};
+    }
+    if(/interest|\bfees?\b/.test(s)) return {type:'Expense',allocation:'Credit card interest & fees',first:true};
+    return null;
+  }
+  if(dir==='out' && /credit\s*card|transfer to (credit )?card|\bcc pay/.test(s)){
+    const c=trackedAcct('Credit card');
+    return c ? {type:'Transfer',allocation:CARD_PAY,other:c,first:true} : {type:'Expense',allocation:CARD_PAY,first:true};
+  }
+  if(/tax.?free|tfsa/.test(s)) return {type:'Transfer',allocation:'Tax free saving'};
+  if(dir==='out' && /\batm\b|cash withdrawal/.test(s) && !/\bfees?\b/.test(s)){
+    const c=trackedAcct('Cash');
+    return c ? {type:'Transfer',allocation:'Cash withdrawal',other:c} : {type:'Expense',allocation:'Cash spending'};
+  }
+  if(!/payment received/.test(s) && /round.?up|inter.?account|own account|banking app transfer|transfer (to|from) (savings|cheque|current|my)/.test(s))
+    return {type:'Transfer',allocation:'Account to account'};
+  return null;
+}
 function addImported(txns, note){
   if(txns===null){ toast('No rows found — a header row plus data is needed',true); return; }
   if(!txns || !txns.length){ toast('No transactions found in that file',true); return; }
@@ -1972,17 +2175,19 @@ function addImported(txns, note){
   let added=0, sug=0;
   txns.forEach(t=>{
     let type=TYPES.includes(t.type)?t.type:'Expense';
-    const dir = type==='Income' ? 'in' : 'out';          // money direction from the statement
-    let alloc=(t.allocation||'').trim(), suggested=false;
-    if(!alloc){
-      const h=hist[stNormDesc(t.description)];
-      if(h && (dir==='in' ? h.type==='Income' : h.type!=='Income')){ type=h.type; alloc=h.allocation; suggested=true; sug++; }
-    }
+    const dir = (type==='Income'||t.refund) ? 'in' : 'out';          // money direction from the statement
     let acct=maskAcct(t.account||''); if(!acct) acct=state.lists.accounts[0]||'';
+    let alloc=(t.allocation||'').trim(), suggested=false, other=maskAcct(t.toAccount||'');
+    if(!alloc){
+      const rule=autoRule(t.description,dir,acct), h=hist[stNormDesc(t.description)];
+      const useH=h && (dir==='in' ? (h.type==='Income'||h.type==='Transfer'||h.refund) : (h.type!=='Income'&&!h.refund));
+      const hit=(rule&&rule.first)?rule:useH?{type:h.type,allocation:h.allocation,other:dir==='in'?h.account:h.toAccount}:rule;
+      if(hit){ type=hit.type; alloc=hit.allocation||''; other=hit.other||other; suggested=true; sug++; }
+    }
     const person=(t.person||'').trim()||defPerson;
     state.staging.push({ id:uid(), date:t.date||'', description:t.description||'', type, allocation:alloc,
       amount:Math.round((Math.abs(Number(t.amount))||0)*100)/100, account:acct, person, notes:t.notes||'',
-      ready:false, suggested, dir });
+      ready:false, suggested, dir, other });
     added++;
   });
   save(); goView('staging');
@@ -1999,7 +2204,7 @@ function stNormDesc(d){ return String(d||'').toLowerCase().replace(/\d{4,}/g,' '
 function stHistoryMap(){
   const m={};
   state.transactions.slice().sort((a,b)=>(a.date<b.date?-1:1)).forEach(t=>{   // newest wins
-    const k=stNormDesc(t.description); if(k && t.allocation) m[k]={type:t.type, allocation:t.allocation};
+    const k=stNormDesc(t.description); if(k && t.allocation) m[k]={type:t.type, allocation:t.allocation, refund:!!t.refund, account:t.account, toAccount:t.toAccount};
   });
   return m;
 }
@@ -2010,6 +2215,24 @@ function stDupInfo(){
   stg().forEach(r=>{ const k=stKey(r); cnt[k]=(cnt[k]||0)+1; });
   const out={};
   stg().forEach(r=>{ const k=stKey(r); out[r.id]={ tx:inTx.has(k), rep:cnt[k]>1 }; });
+  return out;
+}
+function stDir(r){ return r.dir||(r.type==='Income'?'in':'out'); }
+/* The same transfer seen on both statements: find the second copy so it isn't captured twice */
+function stPairs(){
+  const out={}, rows=stg().filter(r=>r.type==='Transfer'), used=new Set();
+  const near=(a,b)=>Math.abs(new Date(a)-new Date(b))<=3*864e5;
+  const same=(a,b)=>Math.abs(Math.abs(Number(a))-Math.abs(Number(b)))<0.005;
+  rows.forEach(r=>{
+    const t=state.transactions.find(x=>x.type==='Transfer'&&!used.has(x.id)&&same(x.amount,r.amount)&&near(x.date,r.date)&&(
+      stDir(r)==='in' ? (x.toAccount===r.account||(!x.toAccount&&x.account!==r.account))
+                      : (!x.account&&x.toAccount!==r.account)));
+    if(t){ used.add(t.id); out[r.id]={txn:t.id}; }
+  });
+  rows.filter(r=>stDir(r)==='in'&&!out[r.id]).forEach(r=>{
+    const o=rows.find(x=>stDir(x)==='out'&&!out[x.id]&&!used.has(x.id)&&x.account!==r.account&&same(x.amount,r.amount)&&near(x.date,r.date));
+    if(o){ used.add(o.id); out[r.id]={row:o.id}; }
+  });
   return out;
 }
 function stAllocsFor(type){
@@ -2060,7 +2283,7 @@ function stFiltered(dups){
   });
 }
 function renderStaging(){
-  const all=stg(), dups=stDupInfo();
+  const all=stg(), dups=stDupInfo(), pairs=stPairs();
   // allocation filter follows the chosen type
   const ty=document.getElementById('stType').value, alEl=document.getElementById('stAlloc'), curAl=alEl.value||'All';
   const als=stAllocsFor(ty);
@@ -2070,7 +2293,7 @@ function renderStaging(){
   // summary cards
   const need=all.filter(r=>!(r.allocation||'').trim()).length;
   const yes=all.filter(r=>r.ready);
-  const inn=sum(yes.filter(r=>r.type==='Income').map(r=>r.amount)), out=sum(yes.filter(r=>r.type!=='Income').map(r=>r.amount));
+  const inn=sum(yes.filter(r=>stDir(r)==='in').map(r=>r.amount)), out=sum(yes.filter(r=>stDir(r)!=='in').map(r=>r.amount));
   const nd=all.filter(r=>dups[r.id].tx||dups[r.id].rep).length;
   document.getElementById('stCards').innerHTML=`
     <div class="st-card"><div class="lab">In review</div><div class="val num">${all.length}</div><div class="sub">lines waiting</div></div>
@@ -2089,7 +2312,9 @@ function renderStaging(){
     body.innerHTML=rows.map(r=>{
       const d=dups[r.id], noAl=!(r.allocation||'').trim(), ok=stComplete(r);
       const tags=(r.suggested?'<span class="st-tag sug">✨ Suggested</span>':'')+
-        (d.tx?'<span class="st-tag dup">⚠ Already in Transactions</span>':'')+(d.rep?'<span class="st-tag dup">⚠ Repeated in this review</span>':'');
+        (d.tx?'<span class="st-tag dup">⚠ Already in Transactions</span>':'')+(d.rep?'<span class="st-tag dup">⚠ Repeated in this review</span>':'')+
+        (pairs[r.id]?'<span class="st-tag dup">⇄ Other side of a transfer, will be left out</span>':'')+
+        (r.type==='Expense'&&stDir(r)==='in'?'<span class="st-tag sug">↩ Refund</span>':'');
       return `<tr class="${noAl?'need-row':''}">
         <td><input type="checkbox" class="stsel" data-id="${r.id}" onchange="stSelChanged()"></td>
         <td><label class="st-yes" title="${ok?'Tick when this line is ready':'Needs a date, an amount above 0 and an allocation'}"><input type="checkbox" ${r.ready?'checked':''} ${ok?'':'disabled'} onchange="stSetReady('${r.id}',this.checked)">Yes</label></td>
@@ -2098,7 +2323,7 @@ function renderStaging(){
         <td><select class="st-in" onchange="stEdit('${r.id}','type',this.value)">${TYPES.map(t=>`<option${t===r.type?' selected':''}>${t}</option>`).join('')}</select></td>
         <td><select class="st-in ${noAl?'need':''}" onchange="stAllocPicked('${r.id}',this)">${stOpts(stAllocsFor(r.type), r.allocation, '— choose —')}<option value="__new">＋ New allocation…</option></select></td>
         <td><input class="st-in num" style="text-align:right" type="number" min="0" step="0.01" value="${(Number(r.amount)||0).toFixed(2)}" onchange="stEdit('${r.id}','amount',this.value)"></td>
-        <td><select class="st-in" onchange="stEdit('${r.id}','account',this.value)">${stOpts(accts, r.account)}</select></td>
+        <td><select class="st-in" onchange="stEdit('${r.id}','account',this.value)">${stOpts(accts, r.account)}</select>${r.type==='Transfer'?`<div class="st-to">${stDir(r)==='in'?'from':'to'}<select class="st-in" onchange="stEdit('${r.id}','other',this.value)">${stOpts(accts.filter(a=>a!==r.account), r.other||'', '— not in EZ-Fin —')}</select></div>`:''}</td>
         <td><select class="st-in" onchange="stEdit('${r.id}','person',this.value)">${stOpts(pers, r.person)}</select></td>
         <td><input class="st-in" value="${esc(r.notes||'')}" placeholder="—" onchange="stEdit('${r.id}','notes',this.value)"></td>
       </tr>`;
@@ -2113,7 +2338,7 @@ function stFind(id){ return stg().find(r=>r.id===id); }
 function stEdit(id, field, v){
   const r=stFind(id); if(!r) return;
   if(field==='amount') v=Math.round((Math.abs(Number(v))||0)*100)/100;
-  if(field==='account') v=maskAcct(v);
+  if(field==='account'||field==='other') v=maskAcct(v);
   if(field==='description'||field==='notes') v=String(v).trim();
   r[field]=v;
   if(field==='type'){ r.suggested=false; if(r.allocation && !(state.lists.allocations[v]||[]).includes(r.allocation) && !stg().some(x=>x!==r&&x.type===v&&x.allocation===r.allocation)) r.allocation=''; }
@@ -2165,21 +2390,37 @@ function stMoveTicked(){
   if(blocked && !confirm(`${blocked} ticked line(s) are dated in a closed or not-yet-started year and will stay here. Move the other ${ticked.length}?`)) return;
   const nd=ticked.filter(r=>dups[r.id].tx||dups[r.id].rep).length;
   if(nd && !confirm(`${nd} of the ticked line(s) look like duplicates. Move them anyway?`)) return;
-  let skippedLists=0;
+  let skippedLists=0, paired=0;
+  // the second copy of a transfer: complete the first copy and leave this one out
+  const pairs=stPairs(), tickedIds=new Set(ticked.map(r=>r.id)), left=new Set();
   ticked.forEach(r=>{
+    const p=pairs[r.id]; if(!p) return;
+    if(p.txn){ const t=state.transactions.find(x=>x.id===p.txn);
+      if(stDir(r)==='in'){ if(!t.toAccount) t.toAccount=r.account; } else { t.account=r.account; }
+      left.add(r.id); paired++; }
+    else if(tickedIds.has(p.row)){ const o=stFind(p.row); if(!o.other) o.other=r.account; left.add(r.id); paired++; }
+  });
+  ticked.forEach(r=>{
+    if(left.has(r.id)) return;
     const L=state.lists.allocations[r.type]||(state.lists.allocations[r.type]=[]);
     if(!L.some(a=>a.toLowerCase()===r.allocation.toLowerCase())) L.push(r.allocation);
     if(r.account && !state.lists.accounts.some(a=>a.toLowerCase()===r.account.toLowerCase())){
       if(state.lists.accounts.length<LIST_LIMITS.accounts) state.lists.accounts.push(r.account); else skippedLists++; }
     if(r.person && !state.lists.persons.some(p=>p.toLowerCase()===r.person.toLowerCase())){
       if(state.lists.persons.length<LIST_LIMITS.persons) state.lists.persons.push(r.person); else skippedLists++; }
-    state.transactions.push({ id:uid(), date:r.date, description:r.description, type:r.type, allocation:r.allocation,
-      amount:Math.abs(Number(r.amount))||0, account:r.account, person:r.person, notes:r.notes||'' });
+    const rec={ id:uid(), date:r.date, description:r.description, type:r.type, allocation:r.allocation,
+      amount:Math.abs(Number(r.amount))||0, account:r.account, person:r.person, notes:r.notes||'' };
+    if(r.type==='Expense'&&stDir(r)==='in') rec.refund=true;
+    if(r.type==='Transfer'){
+      if(stDir(r)==='in'){ rec.account=r.other||''; rec.toAccount=r.account; }
+      else if(r.other) rec.toAccount=r.other;
+    }
+    state.transactions.push(rec);
   });
   const ids=new Set(ticked.map(r=>r.id));
   state.staging=stg().filter(r=>!ids.has(r.id));
   save(); render();
-  toast(`Moved ${ticked.length} line(s) to Transactions`+(skippedLists?' · Setup list limit reached for some accounts/people':''));
+  toast(`Moved ${ticked.length-paired} line(s) to Transactions`+(paired?` · ${paired} matched to the other side of a transfer`:'')+(skippedLists?' · Setup list limit reached for some accounts/people':''));
 }
 
 /* ---------- Column-matching dialog (map a bank layout once, save it) ---------- */
@@ -2266,10 +2507,11 @@ function setBud(type,alloc,m,v){ const k=budKey(type,alloc,m); if(v) state.budge
 function renderBudget(){
   const tbl=document.getElementById('budgetTbl');
   let html=`<thead><tr><th style="min-width:180px">Category</th>${FY.map(m=>`<th class="r">${m}</th>`).join('')}<th class="r">Total</th></tr></thead><tbody>`;
-  const sections=[['Income','Income'],['Deduction','Deductions'],['Expense','Expenses']];
+  const sections=[['Income','Income'],['Deduction','Deductions'],['Expense','Expenses'],['Debt Repayment','Debt Repayments'],['Transfer','Transfers and savings (for planning, not in the totals)']];
   for(const [type,label] of sections){
     html+=`<tr class="sec-row"><td colspan="${FY.length+2}">${label}</td></tr>`;
-    for(const alloc of state.lists.allocations[type]){
+    const yp=activeYear()+'|'+type+'|', extra=Object.keys(state.budgets).filter(k=>k.startsWith(yp)).map(k=>k.split('|')[2]);
+    for(const alloc of [...new Set([...(state.lists.allocations[type]||[]),...extra])]){
       let rowTot=0;
       html+=`<tr><td>${esc(alloc)}</td>`;
       for(const m of FY){ const v=getBud(type,alloc,m); rowTot+=v;
@@ -2290,16 +2532,13 @@ function onBudInput(type,alloc,m,v,el){
     const tot=tr.querySelector('td:last-child b'); if(tot) tot.textContent=fmt0(rt); }
 }
 function updateBudgetTotals(){
-  let bi=0,bd=0,be=0;
+  let bi=0,bd=0,be=0,bdebt=0;
   const yp=activeYear()+'|';
   for(const k in state.budgets){ if(!k.startsWith(yp)) continue; const type=k.split('|')[1]; const v=Number(state.budgets[k])||0;
-    if(type==='Income')bi+=v; else if(type==='Deduction')bd+=v; else be+=v; }
-  const budNet=bi-bd-be;
+    if(type==='Income')bi+=v; else if(type==='Deduction')bd+=v; else if(type==='Debt Repayment')bdebt+=v; else if(type==='Expense')be+=v; }
+  const budNet=bi-bd-be-bdebt;
   const yt=yearTxns();
-  const ai=sum(yt.filter(t=>t.type==='Income').map(t=>t.amount));
-  const ad=sum(yt.filter(t=>t.type==='Deduction').map(t=>t.amount));
-  const ae=sum(yt.filter(t=>t.type==='Expense').map(t=>t.amount));
-  const actNet=ai-ad-ae;
+  const actNet=sumType(yt,'Income')-sumType(yt,'Deduction')-sumType(yt,'Expense')-sumType(yt,'Debt Repayment');
   const varr=actNet-budNet;
   setTxt('budNet',fmt0(budNet)); setTxt('actNet',fmt0(actNet));
   const ve=document.getElementById('varNet'); ve.textContent=fmt(varr); ve.style.color = varr<0?'var(--expense)':'var(--income)';
@@ -2316,16 +2555,16 @@ function renderReports(){
   const rows=yearTxns().filter(t=>person==='All'||t.person===person);
   const wrap=document.getElementById('reportSections'); wrap.innerHTML='';
   wrap.insertAdjacentHTML('beforeend', `<div class="callout" style="margin-bottom:16px">Financial year <b>${fyLabel(activeYear())}</b> · ${fyPeriod(activeYear())}${activeYearClosed()?' · 🔒 closed':''}</div>`);
-  const sections=[['Income','Income','var(--income)'],['Deduction','Deductions','var(--deduction)'],['Expense','Expenses','var(--expense)']];
+  const sections=[['Income','Income','var(--income)'],['Deduction','Deductions','var(--deduction)'],['Expense','Expenses','var(--expense)'],['Debt Repayment','Debt Repayments','var(--debt)'],['Transfer','Transfers (not income or expenses)','var(--transfer)']];
   for(const [type,label] of sections){
-    const cats=state.lists.allocations[type];
+    const cats=[...new Set([...(state.lists.allocations[type]||[]),...rows.filter(t=>t.type===type).map(t=>t.allocation)])];
     const present=cats.filter(c=>rows.some(t=>t.type===type&&t.allocation===c));
     const colTot=Array(FY.length).fill(0); let grand=0;
     let body='';
     for(const c of present){
       let rt=0;
       let tds='';
-      FY.forEach((m,i)=>{ const v=sum(rows.filter(t=>t.type===type&&t.allocation===c&&monthOf(t.date)===m).map(t=>t.amount)); rt+=v; colTot[i]+=v;
+      FY.forEach((m,i)=>{ const v=sum(rows.filter(t=>t.type===type&&t.allocation===c&&monthOf(t.date)===m).map(netAmt)); rt+=v; colTot[i]+=v;
         tds+=`<td class="r num">${v?fmt0(v):'<span style="color:var(--muted-2)">–</span>'}</td>`; });
       grand+=rt;
       body+=`<tr><td>${esc(c)}</td>${tds}<td class="r num"><b>${fmt0(rt)}</b></td></tr>`;
@@ -2346,13 +2585,13 @@ function renderReports(){
   const yRows=ys.map(y=>{ const t=yearTotals(y), rate=t.net>0?t.surplus/t.net*100:0;
     return `<tr${y===activeYear()?' style="font-weight:700"':''}><td>${fyLabel(y)} <span class="ystat ${yearStatus(y)}">${isYearOpen(y)?'Open':'Closed'}</span></td>
       <td class="r num">${fmt0(t.inc)}</td><td class="r num">${fmt0(t.ded)}</td><td class="r num">${fmt0(t.net)}</td>
-      <td class="r num">${fmt0(t.exp)}</td><td class="r num ${t.surplus<0?'neg':'pos'}">${fmt0(t.surplus)}</td>
+      <td class="r num">${fmt0(t.exp)}</td><td class="r num">${fmt0(t.debt)}</td><td class="r num ${t.surplus<0?'neg':'pos'}">${fmt0(t.surplus)}</td>
       <td class="r num">${t.net>0?rate.toFixed(1)+'%':'–'}</td></tr>`; }).join('');
   wrap.insertAdjacentHTML('beforeend', `
     <div class="card" style="margin-bottom:16px">
-      <div class="card-h"><h3>Year-on-year summary</h3><span class="hint">All saved years · savings rate = surplus ÷ net income</span></div>
+      <div class="card-h"><h3>Year-on-year summary</h3><span class="hint">All saved years · savings rate = cash flow ÷ net income</span></div>
       <div class="table-wrap"><table>
-        <thead><tr><th>Year</th><th class="r">Gross income</th><th class="r">Deductions</th><th class="r">Net income</th><th class="r">Expenses</th><th class="r">Surplus</th><th class="r">Savings rate</th></tr></thead>
+        <thead><tr><th>Year</th><th class="r">Gross income</th><th class="r">Deductions</th><th class="r">Net income</th><th class="r">Expenses</th><th class="r">Debt</th><th class="r">Cash flow</th><th class="r">Savings rate</th></tr></thead>
         <tbody>${yRows}</tbody>
       </table></div>
     </div>`);
@@ -2364,12 +2603,12 @@ function renderReports(){
 function renderTax(){
   const person=val('taxPerson');
   const rows=yearTxns().filter(t=>person==='All'||t.person===person);
-  const gross=sum(rows.filter(t=>t.type==='Income').map(t=>t.amount));
+  const gross=sumType(rows,'Income');
   const tax=sum(rows.filter(t=>t.type==='Deduction'&&/tax|paye/i.test(t.allocation)).map(t=>t.amount));
   const cm=claimMap();
   // Recorded total (abs) per claimable key from matching transactions
   const rec={};
-  rows.forEach(t=>{ const k=ckey(t.type,t.allocation); if(k in cm) rec[k]=(rec[k]||0)+Math.abs(t.amount); });
+  rows.forEach(t=>{ const k=ckey(t.type,t.allocation); if(k in cm) rec[k]=(rec[k]||0)+netAmt(t); });
   // One row per marked-claimable key — including those with no recorded amount
   let claimTotal=0, recTotal=0;
   const list=Object.keys(cm).map(k=>{
@@ -2405,7 +2644,10 @@ function renderSetup(){
   chipBox('listIncome', state.lists.allocations.Income, i=>removeAlloc('Income',i));
   chipBox('listDeduction', state.lists.allocations.Deduction, i=>removeAlloc('Deduction',i));
   chipBox('listExpense', state.lists.allocations.Expense, i=>removeAlloc('Expense',i));
+  chipBox('listDebt', state.lists.allocations['Debt Repayment'], i=>removeAlloc('Debt Repayment',i));
+  chipBox('listTransfer', state.lists.allocations.Transfer, i=>removeAlloc('Transfer',i));
   chipBox('listAccounts', state.lists.accounts, i=>removeSimple('accounts',i));
+  renderAcctSettings();
   chipBox('listPersons', state.lists.persons, i=>removeSimple('persons',i));
   renderClaimable();
   renderCurrency();
@@ -2416,6 +2658,76 @@ function renderSetup(){
       : '<p class="tiny">No saved layouts yet. They appear here after you map and save a bank statement during import.</p>';
   }
   const un=document.getElementById('userNameInput'); if(un) un.value=(state.settings&&state.settings.userName)||'';
+}
+function renderAcctSettings(){
+  const box=document.getElementById('acctSettings'); if(!box) return;
+  box.innerHTML=state.lists.accounts.map((a,i)=>{
+    const inf=acctInfo(a), k=inf.kind;
+    return `<div class="acct-row"><b title="${esc(a)}">${esc(a)}</b>
+      <select class="field" onchange="acctKind(${i},this.value)">${['Bank','Credit card','Cash'].map(o=>`<option${o===k?' selected':''}>${o}</option>`).join('')}</select>
+      ${k==='Bank'?'':`<label><input type="checkbox" ${inf.track?'checked':''} onchange="acctTrack(${i},this.checked)"> I record purchases on this account</label>`}</div>`;
+  }).join('');
+}
+function acctKind(i,kind){
+  const a=state.lists.accounts[i], was=acctInfo(a).kind; setAcctInfo(a,{kind,track:kind==='Bank'?false:acctInfo(a).track});
+  if(was==='Credit card'||kind==='Credit card') syncCardChoice();
+  save(); renderSetup();
+}
+function acctTrack(i,on){
+  const a=state.lists.accounts[i]; setAcctInfo(a,{track:!!on});
+  if(acctInfo(a).kind==='Credit card') syncCardChoice();
+  save(); render();
+}
+// Card purchases recorded = payments are Transfers. Not recorded = payments stay Expenses.
+function syncCardChoice(){
+  const on=!!trackedAcct('Credit card'), src=on?'Expense':'Transfer';
+  if(state.settings.cardChoice===(on?'yes':'no')) return;
+  const n=(state.transactions||[]).filter(t=>isCardPay(t)&&t.type===src&&yearStatus(fyStartOf(t.date))!=='closed').length;
+  if(n && !confirm(`Change ${n} credit card payment(s) to ${on?'Transfers (not counted as spending)':'Expenses'}?`)) return;
+  applyCardChoice(on);
+}
+function applyCardChoice(track){
+  const L=state.lists.allocations, tgt=track?'Transfer':'Expense', src=track?'Expense':'Transfer';
+  if(!L[tgt].some(a=>a.toLowerCase()===CARD_PAY.toLowerCase())) L[tgt].push(CARD_PAY);
+  const card=trackedAcct('Credit card'), open=t=>yearStatus(fyStartOf(t.date))!=='closed';
+  (state.transactions||[]).concat(state.archived||[]).forEach(t=>{
+    if(!isCardPay(t)||t.type!==src||!open(t)) return;
+    t.type=tgt;
+    if(track){ if(card&&!t.toAccount&&t.account!==card) t.toAccount=card; } else delete t.toAccount;
+  });
+  (state.staging||[]).forEach(r=>{ if(isCardPay(r)&&r.type===src) r.type=tgt; });
+  const nb={};
+  Object.keys(state.budgets||{}).forEach(k=>{
+    const p=k.split('|');
+    if(p.length===4&&p[1]===src&&p[2].toLowerCase()===CARD_PAY.toLowerCase()&&yearStatus(p[0])!=='closed') p[1]=tgt;
+    nb[p.join('|')]=state.budgets[k];
+  });
+  state.budgets=nb;
+  state.settings.cardChoice=track?'yes':'no';
+}
+/* One-time question for people who already have card payments saved as Expenses */
+let _cardAsked=false;
+function maybeCardPrompt(){
+  if(_cardAsked||state.settings.cardChoice) return;
+  if(typeof subReadOnly==='function'&&subReadOnly()&&cloudOn()) return;
+  if(document.querySelector('.gate.show')) return;
+  const r=state.transactions.filter(t=>t.type==='Expense'&&isCardPay(t)&&yearStatus(fyStartOf(t.date))!=='closed');
+  if(!r.length) return;
+  _cardAsked=true;
+  document.getElementById('cardQText').innerHTML=`We found <b>${r.length}</b> credit card payment${r.length!==1?'s':''} totalling <b>${fmt(sum(r.map(netAmt)))}</b>. Do you also record the <b>purchases</b> made on your card in EZ-Fin?`;
+  document.getElementById('cardModal').classList.add('show');
+}
+function cardAnswer(yes){
+  document.getElementById('cardModal').classList.remove('show');
+  if(yes===null) return;
+  if(yes){
+    let cards=state.lists.accounts.filter(a=>acctInfo(a).kind==='Credit card');
+    if(!cards.length && state.lists.accounts.length<LIST_LIMITS.accounts){ state.lists.accounts.push('Credit card'); cards=['Credit card']; }
+    cards.forEach(a=>setAcctInfo(a,{kind:'Credit card',track:true}));
+  }
+  applyCardChoice(!!yes);
+  save(); render();
+  toast(yes?'Card payments are now Transfers':'Card payments stay as Expenses. Change this any time in Setup');
 }
 function setUserName(v){ if(!state.settings) state.settings={}; state.settings.userName=v; save(); renderGreeting(); }
 function renderCurrency(){
@@ -2488,7 +2800,7 @@ function renderClaimable(){
   });
 }
 function addAlloc(type){
-  const inp=document.getElementById('add'+type); const v=inp.value.trim(); if(!v) return;
+  const inp=document.getElementById('add'+type.replace(' Repayment','')); const v=inp.value.trim(); if(!v) return;
   if(!state.lists.allocations[type].includes(v)) state.lists.allocations[type].push(v);
   inp.value=''; save(); renderSetup(); refreshDropdowns(); toast('Added');
 }
@@ -2535,7 +2847,9 @@ function mkSession(d){ return { access_token:d.access_token, refresh_token:d.ref
 /* --- Built-in Supabase connection (baked in so every visitor gets a login screen) --- */
 const BUILTIN_SUPA_URL='https://rkfmeseqfiyqroijgopn.supabase.co';
 const BUILTIN_SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJrZm1lc2VxZml5cXJvaWpnb3BuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxNjgxODcsImV4cCI6MjEwMzc0NDE4N30.kSIhxL-EManT7293R46jqqNPCDdR_W89tw4zgKEwSPE';
-const CLOUD_FORCED = !!(BUILTIN_SUPA_URL && BUILTIN_SUPA_KEY);
+// Opened from a file on a computer = test copy: no login and nothing can reach the live data
+const LOCAL_TEST = location.protocol==='file:';
+const CLOUD_FORCED = !!(BUILTIN_SUPA_URL && BUILTIN_SUPA_KEY) && !LOCAL_TEST;
 
 function normUrl(raw){
   let u=(raw||'').trim().replace(/\s+/g,'');
@@ -3010,6 +3324,7 @@ function render(){
     case 'years': renderYears(); break;
     case 'setup': renderSetup(); break;
   }
+  maybeCardPrompt();
 }
 
 /* close modals on backdrop / escape */
@@ -3017,7 +3332,9 @@ document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.querySelectorAll('.modal-bg.show').forEach(m=>m.classList.remove('show')); });
 
 /* boot */
+if(LOCAL_TEST){ document.body.insertAdjacentHTML('afterbegin','<div class="test-strip">TEST COPY: saved on this computer only, your live data is not touched</div>'); }
 loadSession();
+if(LOCAL_TEST) saveSession(null);
 load();
 refreshDropdowns();
 (async()=>{
