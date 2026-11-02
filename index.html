@@ -406,6 +406,33 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
 .ystat.closed{background:var(--chip); color:var(--muted)}
 #view-years td.num{white-space:nowrap}
 .year-rules{display:grid; gap:4px; margin:0; padding-left:18px; font-size:13px}
+/* cash slips */
+.modal.slip-modal{max-width:880px}
+.slip-pick{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+.slip-tile{display:grid; justify-items:center; gap:8px; padding:30px 12px; border:1.5px dashed var(--line); border-radius:var(--radius); background:var(--panel-2); font-weight:700; cursor:pointer; text-align:center}
+.slip-tile:hover{border-color:var(--brand); color:var(--brand)}
+.slip-tile .big{font-size:32px; line-height:1}
+.slip-grid{display:grid; grid-template-columns:minmax(0,5fr) minmax(0,6fr); gap:18px; align-items:start}
+.slip-photo{max-height:60vh; overflow:auto; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--panel-2); cursor:zoom-in}
+.slip-photo.big{max-height:none; cursor:zoom-out}
+.slip-photo img{display:block; width:100%}
+.slip-retake{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:8px}
+.slip-fields{display:grid; gap:14px; min-width:0}
+#slipLines{display:grid; gap:8px}
+.slip-line{display:grid; grid-template-columns:minmax(0,1fr) 110px 30px; gap:8px; align-items:center}
+.slip-line .field{width:100%}
+.slip-line.one{grid-template-columns:minmax(0,1fr)}
+.slip-line.one input,.slip-line.one .x{display:none}
+.slip-add{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px}
+.slip-left{font-size:12.5px; font-weight:700}
+.slip-status{font-size:12.5px; font-weight:700; color:var(--muted); min-height:18px}
+.slip-status.pos{color:var(--income)} .slip-status.neg{color:var(--expense)}
+.slip-left.pos{color:var(--income)} .slip-left.neg{color:var(--expense)}
+@media (max-width:760px){
+  .slip-grid{grid-template-columns:minmax(0,1fr)}
+  .slip-photo{max-height:34vh}
+  .slip-line{grid-template-columns:minmax(0,1fr) 92px 30px}
+}
 @media print{
   header.top, nav.tabs, .filters, .no-print, #toast{display:none !important}
   main{max-width:100%; padding:0}
@@ -582,6 +609,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
         <div class="no-print" style="display:flex; gap:8px; flex-wrap:wrap">
           <button class="btn ghost" onclick="exportCsv()">📤 Export CSV</button>
           <button class="btn ghost" onclick="openArchive()">🗄 Archive</button>
+          <button class="btn ghost" onclick="openSlip()">📷 Cash slip</button>
           <button class="btn primary" onclick="openTxn()">＋ New transaction</button>
         </div>
       </div>
@@ -900,6 +928,48 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
     <div class="modal-f">
       <button class="btn ghost" onclick="closeTxn()">Cancel</button>
       <button class="btn primary" onclick="saveTxn()">Save transaction</button>
+    </div>
+  </div>
+</div>
+
+<!-- Cash slip -->
+<div class="modal-bg" id="slipModal">
+  <div class="modal slip-modal">
+    <div class="modal-h"><h3>Cash slip</h3><button class="x" onclick="closeSlip()">×</button></div>
+    <div class="modal-b">
+      <div class="slip-pick" id="slipPick">
+        <label class="slip-tile"><span class="big">📷</span>Take a photo<input type="file" accept="image/*" capture="environment" hidden onchange="slipFile(this)"></label>
+        <label class="slip-tile"><span class="big">🖼</span>Choose a picture<input type="file" accept="image/*" hidden onchange="slipFile(this)"></label>
+      </div>
+      <div class="tiny" id="slipNote">EZ-Fin reads your slip on this device. The photo is not uploaded or saved.</div>
+      <div class="slip-grid" id="slipWork" style="display:none">
+        <div>
+          <div class="slip-photo" id="slipPhoto" onclick="this.classList.toggle('big')"><img id="slipImg" alt="Photo of your slip"></div>
+          <div class="slip-retake"><span class="tiny">Tap the slip to enlarge it</span><label class="btn ghost sm">Retake<input type="file" accept="image/*" capture="environment" hidden onchange="slipFile(this)"></label></div>
+        </div>
+        <div class="slip-fields">
+          <div class="slip-status" id="slipStatus"></div>
+          <div class="frow two">
+            <div class="frow"><label>Date</label><input type="date" class="field" id="sDate"></div>
+            <div class="frow"><label>Slip total</label><input type="number" step="0.01" min="0" inputmode="decimal" class="field num" id="sTotal" placeholder="0.00" oninput="slipLeft()"></div>
+          </div>
+          <div class="frow"><label>Shop</label><input class="field" id="sShop" placeholder="e.g. Spar" onchange="slipShopChanged()"></div>
+          <div class="frow"><label>Allocate to</label>
+            <div id="slipLines"></div>
+            <div class="slip-add"><button type="button" class="btn ghost sm" onclick="slipAddLine()">＋ Split into another allocation</button><span class="slip-left" id="slipLeft"></span></div>
+          </div>
+          <div class="frow two">
+            <div class="frow"><label>Paid from</label><select class="field" id="sAccount" onchange="slipLeft()"></select></div>
+            <div class="frow"><label>Person</label><select class="field" id="sPerson"></select></div>
+          </div>
+          <div class="frow"><label>Notes <span class="tiny">(optional)</span></label><input class="field" id="sNotes" placeholder="Anything to remember…"></div>
+          <div class="tiny" id="slipCash"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-f">
+      <button class="btn ghost" onclick="closeSlip()">Cancel</button>
+      <button class="btn primary" id="slipSaveBtn" style="display:none" onclick="saveSlip()">Save slip</button>
     </div>
   </div>
 </div>
@@ -1963,6 +2033,224 @@ function saveTxn(){
   else state.transactions.push(rec);
   save(); closeTxn(); render();
   toast(editingId?'Transaction updated':'Transaction saved');
+}
+
+/* ============================================================
+   CASH SLIPS
+   Photo a slip, the phone reads the shop, date and total, the person
+   checks them and allocates (split if needed). Saved as Expense lines
+   from the Cash account. The photo is read on the device and is never
+   uploaded or saved: it is dropped when the screen closes.
+   The reader (Tesseract) downloads on first use, then the browser keeps it.
+   ============================================================ */
+const OCR_URL='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+const OCR_SIDE=2400;
+let _slip=null, _slipRun=0, _ocrLoad=null;
+function slipEl(id){ return document.getElementById(id); }
+function cents(n){ return Math.round((Number(n)||0)*100); }
+
+/* --- Cash account --- */
+function slipCashAccount(){
+  let a=trackedAcct('Cash'); if(a) return a;
+  const have=state.lists.accounts.find(x=>acctInfo(x).kind==='Cash');
+  if(!have && state.lists.accounts.length>=LIST_LIMITS.accounts){ toast('You have 10 accounts. Remove one in Setup to add a Cash account',true); return ''; }
+  if(!confirm(`Cash slips come out of a Cash account, so your spending isn't counted twice.\n\n${have?`EZ-Fin will record purchases on "${have}"`:'EZ-Fin will add a Cash account'}. From now on, ATM withdrawals are transfers into Cash and each slip is the expense.\n\nWithdrawals already recorded stay as they are.`)) return '';
+  a=have||'Cash';
+  if(!have) state.lists.accounts.push(a);
+  setAcctInfo(a,{kind:'Cash',track:true});
+  save(); refreshDropdowns();
+  return a;
+}
+function cashBalance(a){
+  let c=0;
+  state.transactions.forEach(t=>{
+    if(t.type==='Transfer'){ if(t.account===a) c-=cents(t.amount); if(t.toAccount===a) c+=cents(t.amount); }
+    else if(t.account===a) c+=cents(signed(t));
+  });
+  return c/100;
+}
+
+/* --- reading the slip --- */
+function ocrLibrary(){
+  if(window.Tesseract) return Promise.resolve();
+  if(!_ocrLoad) _ocrLoad=new Promise((ok,no)=>{
+    const s=document.createElement('script'); s.src=OCR_URL; s.onload=ok;
+    s.onerror=()=>{ _ocrLoad=null; s.remove(); no(new Error('load')); };
+    document.head.appendChild(s);
+  });
+  return _ocrLoad;
+}
+// Black-and-white, higher-contrast copy: thermal slips read much better this way
+async function slipPrepare(url){
+  const img=new Image(); img.src=url; await img.decode();
+  const k=Math.min(1,OCR_SIDE/Math.max(img.naturalWidth,img.naturalHeight));
+  const c=document.createElement('canvas');
+  c.width=Math.round(img.naturalWidth*k); c.height=Math.round(img.naturalHeight*k);
+  const g=c.getContext('2d',{willReadFrequently:true}); g.drawImage(img,0,0,c.width,c.height);
+  const d=g.getImageData(0,0,c.width,c.height), p=d.data; let lo=255, hi=0;
+  for(let i=0;i<p.length;i+=4){ const v=.299*p[i]+.587*p[i+1]+.114*p[i+2]; p[i]=v; if(v<lo) lo=v; if(v>hi) hi=v; }
+  const span=Math.max(1,hi-lo);
+  for(let i=0;i<p.length;i+=4){ const v=Math.max(0,Math.min(255,(p[i]-lo)*255/span)); p[i]=p[i+1]=p[i+2]=v; }
+  g.putImageData(d,0,0);
+  return c;
+}
+async function slipOcr(url,onPct){
+  await ocrLibrary();
+  const canvas=await slipPrepare(url);
+  const w=await Tesseract.createWorker('eng',1,{logger:m=>{ if(m.status==='recognizing text') onPct(Math.round(m.progress*100)); }});
+  try{ return (await w.recognize(canvas)).data.text||''; }
+  finally{ await w.terminate(); canvas.width=canvas.height=0; }
+}
+/* Pull the shop, date and total out of the text. A blank means "not sure": the person types it. */
+function slipAmount(line){
+  let last=null;
+  for(const m of String(line).matchAll(/(\d{1,3}(?:[ ,]\d{3})+|\d+)\s?[.,]\s?(\d{2})(?!\d)/g)) last=m;
+  return last ? Number(last[1].replace(/[ ,]/g,'')+'.'+last[2]) : null;
+}
+function slipTotalFrom(lines){
+  const skip=/sub.?total|total.*(vat|tax|items?|units?|disc|sav|excl|qty)|(vat|tax|items?|disc|sav|excl).*total/i;
+  const found=[]; let saw=false;
+  lines.forEach((l,i)=>{
+    if(!/\b(grand total|total|amount due|amt due|balance due|to pay)\b/i.test(l) || skip.test(l)) return;
+    saw=true;
+    let a=slipAmount(l);
+    if(a===null && !/\d/.test(l) && i+1<lines.length && !/cash|tender|change/i.test(lines[i+1])) a=slipAmount(lines[i+1]);
+    if(a) found.push(a);
+  });
+  if(found.length) return Math.max(...found);
+  if(saw) return null;   // the total line is there but unreadable: better blank than wrong
+  const rest=lines.filter(l=>!/cash|tender|change|vat|tax|tel|phone|card|ref|auth/i.test(l)).map(slipAmount).filter(Boolean);
+  return rest.length ? Math.max(...rest) : null;
+}
+function slipIso(y,m,d){
+  y=Number(y); m=Number(m); d=Number(d); if(y<100) y+=2000;
+  const dt=new Date(Date.UTC(y,m-1,d));
+  if(dt.getUTCFullYear()!==y||dt.getUTCMonth()!==m-1||dt.getUTCDate()!==d) return '';
+  return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+function slipDateFrom(text){
+  let m=text.match(/\b(20\d{2})[-\/.](\d{1,2})[-\/.](\d{1,2})\b/); if(m){ const r=slipIso(m[1],m[2],m[3]); if(r) return r; }
+  m=text.match(/\b(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4}|\d{2})\b/); if(m){ const r=slipIso(m[3],m[2],m[1]); if(r) return r; }   // SA order: day first
+  m=text.match(/\b(\d{1,2})[ -]?(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[ ,-]*(\d{4}|\d{2})\b/i);
+  if(m){ const i='janfebmaraprmayjunjulaugsepoctnovdec'.indexOf(m[2].toLowerCase())/3+1; const r=slipIso(m[3],i,m[1]); if(r) return r; }
+  return '';
+}
+function slipShopFrom(lines){
+  for(const l of lines.slice(0,8)){
+    const c=l.replace(/[^A-Za-z0-9&'.\- ]/g,' ').replace(/\s+/g,' ').trim();
+    if(/tax invoice|invoice|receipt|welcome|vat|tel|reg\b|www|@|cashier|till|date/i.test(c)) continue;
+    if((c.match(/[A-Za-z]/g)||[]).length>=3 && !/\d{4}/.test(c)) return c;
+  }
+  return '';
+}
+function slipParse(text){
+  text=String(text||'');
+  const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  return {shop:slipShopFrom(lines), date:slipDateFrom(text), total:slipTotalFrom(lines)};
+}
+
+/* --- the slip screen --- */
+function slipStatus(t,cls){ const e=slipEl('slipStatus'); e.textContent=t; e.className='slip-status'+(cls?' '+cls:''); }
+function openSlip(){
+  if(typeof subReadOnly==='function' && subReadOnly() && cloudOn()){ toast('View-only — choose a plan to make changes',true); openAccount(true); return; }
+  const cash=slipCashAccount(); if(!cash) return;
+  slipClear();
+  _slip={url:null,lines:[{alloc:'',amt:''}]};
+  const ay=activeYear(), td=todayISO(); let d=td;
+  if(isYearOpen(ay) && fyStartOf(td)!==ay){ const r=fyRange(ay); d=td>r.to?r.to:r.from; }
+  _slip.defDate=d;
+  slipEl('sDate').value=d; slipEl('sShop').value=''; slipEl('sTotal').value=''; slipEl('sNotes').value='';
+  fillSelect('sAccount',state.lists.accounts,false); fillSelect('sPerson',state.lists.persons,false);
+  slipEl('sAccount').value=cash; slipEl('sPerson').value=state.lists.persons[0];
+  slipEl('slipPick').style.display=''; slipEl('slipWork').style.display='none'; slipEl('slipSaveBtn').style.display='none';
+  slipEl('slipPhoto').classList.remove('big'); slipEl('slipNote').style.display=''; slipStatus('');
+  slipEl('slipModal').classList.add('show');
+}
+function slipClear(){ _slipRun++; if(_slip&&_slip.url) URL.revokeObjectURL(_slip.url); slipEl('slipImg').removeAttribute('src'); _slip=null; }
+function closeSlip(){ slipEl('slipModal').classList.remove('show'); slipClear(); }
+async function slipFile(inp){
+  const f=inp.files&&inp.files[0]; inp.value=''; if(!f||!_slip) return;
+  const url=URL.createObjectURL(f), img=slipEl('slipImg');
+  img.src=url;
+  try{ await img.decode(); }
+  catch(e){ URL.revokeObjectURL(url); toast('That picture could not be opened. Please try a JPG or PNG photo',true); return; }
+  if(!_slip){ URL.revokeObjectURL(url); return; }
+  if(_slip.url) URL.revokeObjectURL(_slip.url);
+  _slip.url=url;
+  slipEl('slipPick').style.display='none'; slipEl('slipNote').style.display='none'; slipEl('slipWork').style.display=''; slipEl('slipSaveBtn').style.display='';
+  slipLines();
+  const run=++_slipRun;
+  slipStatus('Reading your slip…');
+  let text=null;
+  try{ text=await slipOcr(url,p=>{ if(run===_slipRun) slipStatus(`Reading your slip… ${p}%`); }); }catch(e){ console.warn(e); }
+  if(run!==_slipRun) return;   // closed or retaken while reading
+  if(text===null){ slipStatus("Couldn't read this slip here. Please type the details.",'neg'); return; }
+  const r=slipParse(text);
+  if(r.shop && !slipEl('sShop').value.trim()){ slipEl('sShop').value=r.shop; slipShopChanged(); }
+  if(r.date && dateEditable(r.date) && slipEl('sDate').value===_slip.defDate) slipEl('sDate').value=r.date;
+  if(r.total && !slipEl('sTotal').value) slipEl('sTotal').value=r.total.toFixed(2);
+  slipLeft();
+  const miss=[!r.shop&&'shop',!r.date&&'date',!r.total&&'total'].filter(Boolean);
+  if(miss.length===3) slipStatus("Couldn't read this slip. Please type the details or retake the photo.",'neg');
+  else slipStatus(miss.length?`Please check everything and add the ${miss.join(' and ')}.`:'Please check these against the slip.','pos');
+}
+function slipRead(){
+  document.querySelectorAll('#slipLines .slip-line').forEach((r,i)=>{
+    _slip.lines[i].alloc=r.querySelector('select').value;
+    _slip.lines[i].amt=r.querySelector('input').value;
+  });
+}
+function slipLines(){
+  const items=state.lists.allocations.Expense||[], many=_slip.lines.length>1;
+  slipEl('slipLines').innerHTML=_slip.lines.map((l,i)=>`<div class="slip-line${many?'':' one'}">
+    <select class="field" aria-label="Allocation" onchange="slipRead();slipLeft()"><option value="">Choose allocation…</option>${items.map(a=>`<option${a===l.alloc?' selected':''}>${esc(a)}</option>`).join('')}</select>
+    <input type="number" step="0.01" min="0" inputmode="decimal" class="field num" aria-label="Amount" placeholder="0.00" value="${esc(l.amt)}" oninput="slipRead();slipLeft()">
+    <button type="button" class="x" aria-label="Remove line" onclick="slipDropLine(${i})">×</button></div>`).join('');
+  slipLeft();
+}
+function slipAddLine(){
+  slipRead();
+  if(_slip.lines.length===1) _slip.lines[0].amt='';
+  const left=_slip.lines.length===1?0:slipRemain();
+  _slip.lines.push({alloc:'',amt:left>0?(left/100).toFixed(2):''});
+  slipLines();
+}
+function slipDropLine(i){ slipRead(); _slip.lines.splice(i,1); slipLines(); }
+function slipRemain(){ return cents(slipEl('sTotal').value)-_slip.lines.reduce((s,l)=>s+cents(l.amt),0); }
+function slipLeft(){
+  if(!_slip) return;
+  const total=cents(slipEl('sTotal').value), many=_slip.lines.length>1, box=slipEl('slipLeft');
+  if(!many){ box.textContent=''; box.className='slip-left'; }
+  else{ const left=slipRemain(); box.textContent= left===0?'✓ Fully allocated':left>0?`Left to allocate: ${fmt(left/100)}`:`Over by ${fmt(-left/100)}`; box.className='slip-left '+(left===0?'pos':'neg'); }
+  const a=slipEl('sAccount').value, hint=slipEl('slipCash');
+  if(acctInfo(a).kind==='Cash'){
+    const bal=cashBalance(a);
+    hint.textContent=`Cash recorded in EZ-Fin: ${fmt(bal)}`+(total/100>bal?'. This slip is more than that, so check your ATM withdrawal is recorded.':'');
+  } else hint.textContent='';
+}
+function slipShopChanged(){
+  if(!_slip||_slip.lines.length!==1) return;
+  slipRead(); if(_slip.lines[0].alloc) return;
+  const shop=slipEl('sShop').value.trim().toLowerCase(); if(!shop) return;   // same shop as before: offer its last allocation
+  const L=state.transactions.filter(t=>t.type==='Expense'&&t.allocation&&(t.description||'').trim().toLowerCase()===shop).sort((x,y)=>x.date<y.date?1:-1)[0];
+  if(L){ _slip.lines[0].alloc=L.allocation; slipLines(); }
+}
+function saveSlip(){
+  if(!_slip) return;
+  slipRead();
+  const date=slipEl('sDate').value, total=cents(slipEl('sTotal').value), many=_slip.lines.length>1;
+  if(!date){ toast('Please pick a date',true); return; }
+  if(!dateEditable(date)){ toast(dateBlockMsg(date),true); return; }
+  if(total<=0){ toast('Enter the slip total',true); return; }
+  if(_slip.lines.some(l=>!l.alloc)){ toast('Choose an allocation for each line',true); return; }
+  const lines=_slip.lines.map(l=>({alloc:l.alloc,c:many?cents(l.amt):total}));
+  if(lines.some(l=>l.c<=0)){ toast('Enter an amount on each line',true); return; }
+  if(lines.reduce((s,l)=>s+l.c,0)!==total){ toast(`The lines must add up to the slip total of ${fmt(total/100)}`,true); return; }
+  const description=slipEl('sShop').value.trim()||'Cash slip', account=slipEl('sAccount').value,
+        person=slipEl('sPerson').value, notes=slipEl('sNotes').value.trim();
+  lines.forEach(l=>state.transactions.push({id:uid(),date,description,type:'Expense',allocation:l.alloc,amount:l.c/100,account,person,notes}));
+  save(); closeSlip(); render();
+  toast(`Slip saved: ${fmt(total/100)}`+(many?` on ${lines.length} lines`:''));
 }
 
 /* CSV */
