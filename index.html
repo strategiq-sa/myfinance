@@ -1006,13 +1006,36 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
     <div class="modal-h"><h3>Match your statement columns</h3><button class="x" onclick="closeMap()">×</button></div>
     <div class="modal-b">
       <p class="tiny">Tell EZ-Fin which of your file's columns is which — we've guessed where we can. Map <b>either</b> a single <b>Amount</b> column <b>or</b> the separate <b>Money in / Money out</b> columns (whichever your bank uses). Save it and next time this layout imports automatically.</p>
+      <div class="map-grid">
+        <label class="map-row"><span>Which account is this statement for? <b style="color:var(--expense)">*</b></span>
+          <span><select class="field" id="mapAccount" style="width:100%" onchange="acctNewToggle('mapAccount','mapAccountNew')"></select>
+          <input class="field" id="mapAccountNew" placeholder="New account name" style="display:none; width:100%; margin-top:6px"></span></label>
+      </div>
       <div class="map-grid" id="mapGrid"></div>
+      <div class="callout" id="mapWarn" style="margin-top:12px; display:none"></div>
       <div class="callout" id="mapPreview" style="margin-top:12px"></div>
+      <label class="map-save"><input type="checkbox" id="mapFlip" onchange="mapPreview()"> Swap money in and money out <span class="tiny">(tick this if the preview has them the wrong way round)</span></label>
       <label class="map-save"><input type="checkbox" id="mapSaveChk" checked> Save this layout as <input class="field" id="mapSaveName" placeholder="e.g. Capitec"></label>
     </div>
     <div class="modal-f">
       <button class="btn ghost" onclick="closeMap()">Cancel</button>
       <button class="btn primary" onclick="confirmMapping()">Send to Import Statement</button>
+    </div>
+  </div>
+</div>
+
+<!-- Quick account question when a saved layout is used -->
+<div class="modal-bg" id="acctModal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-h"><h3>Which account is this statement for?</h3><button class="x" onclick="closeAcctPick()">×</button></div>
+    <div class="modal-b">
+      <p class="tiny" id="acctPickInfo"></p>
+      <select class="field" id="acctPickSel" style="width:100%" onchange="acctNewToggle('acctPickSel','acctPickNew')"></select>
+      <input class="field" id="acctPickNew" placeholder="New account name" style="display:none; width:100%; margin-top:6px">
+    </div>
+    <div class="modal-f">
+      <button class="btn ghost" onclick="closeAcctPick()">Cancel</button>
+      <button class="btn primary" onclick="confirmAcctPick()">Send to Import Statement</button>
     </div>
   </div>
 </div>
@@ -1996,14 +2019,61 @@ function _num(x){ x=String(x==null?'':x).replace(/[^0-9.\-]/g,''); const n=parse
    3) anything new → open the column-matching dialog (pre-filled with guesses). */
 const MAP_NATIVE='date|description|type|allocation|amount|account|person|notes';
 function makeSig(header){ return header.map(h=>String(h==null?'':h).trim().toLowerCase()).join('|'); }
-function beginTabularImport(rows){
+function beginTabularImport(rows,meta){
+  meta=meta||{};
   if(!rows||rows.length<2){ toast('No rows found — a header row plus data is needed',true); return; }
   const header=rows[0].map(h=>String(h==null?'':h).trim());
-  const sig=makeSig(header);
+  const sig=meta.sig||makeSig(header);
   if(sig===MAP_NATIVE){ addImported(rowsToTxns(rows)); return; }
   const saved=(state.lists.importMappings||[]).find(m=>m.sig===sig);
-  if(saved){ addImported(applyMapping(rows,saved), `used your “${saved.name}” layout`); return; }
-  openMapDialog(rows,header,sig);
+  if(saved){
+    const txns=applyMapping(rows,saved);
+    const note=[`used your “${saved.name}” layout`,meta.note].filter(Boolean).join(' · ');
+    const known=ciList(state.lists.accounts,saved.account);
+    const send=acct=>{ saved.account=acct; addImported(withAccount(txns,acct),note); };
+    if(txns.length&&txns.every(t=>String(t.account||'').trim())){ addImported(txns,note); return; }   // the file names the account
+    if(meta.last4&&known){ send(known); return; }                                                     // PDF for this exact account
+    if(state.lists.accounts.length===1){ send(state.lists.accounts[0]); return; }
+    openAcctPick(known||meta.account||'',txns.length,saved.name,send);
+    return;
+  }
+  openMapDialog(rows,header,sig,meta);
+}
+function ciList(list,v){ v=String(v||'').trim().toLowerCase(); return v?(list||[]).find(x=>String(x).toLowerCase()===v)||'':''; }
+/* lines with no account of their own go to the account the person chose */
+function withAccount(txns,acct){ txns.forEach(t=>{ if(!String(t.account||'').trim()) t.account=acct; }); return txns; }
+/* account dropdown shared by the column-matching dialog and the quick account question */
+function acctOptions(sel){
+  const L=state.lists.accounts, pick=ciList(L,sel)||(L.length===1?L[0]:'');
+  return `<option value="">— choose an account —</option>`+L.map(a=>`<option value="${esc(a)}"${a===pick?' selected':''}>${esc(a)}</option>`).join('')+
+    (L.length<LIST_LIMITS.accounts?'<option value="__new">＋ Add a new account…</option>':'');
+}
+function acctNewToggle(selId,inpId){
+  const inp=document.getElementById(inpId), on=document.getElementById(selId).value==='__new';
+  inp.style.display=on?'':'none'; if(on) inp.focus();
+}
+function readAcct(selId,inpId){
+  const v=document.getElementById(selId).value;
+  if(v!=='__new') return v;
+  const name=maskAcct(document.getElementById(inpId).value); if(!name) return '';
+  const hit=ciList(state.lists.accounts,name); if(hit) return hit;
+  state.lists.accounts.push(name); return name;
+}
+/* quick question when a saved layout is used: the same layout can belong to more than one account */
+let _acctCtx=null;
+function openAcctPick(sel,n,name,send){
+  _acctCtx={send};
+  document.getElementById('acctPickInfo').textContent=`${n} line(s) found using your “${name}” layout.`;
+  document.getElementById('acctPickSel').innerHTML=acctOptions(sel);
+  const inp=document.getElementById('acctPickNew'); inp.value=''; inp.style.display='none';
+  document.getElementById('acctModal').classList.add('show');
+}
+function closeAcctPick(){ document.getElementById('acctModal').classList.remove('show'); _acctCtx=null; }
+function confirmAcctPick(){
+  if(!_acctCtx) return;
+  const acct=readAcct('acctPickSel','acctPickNew');
+  if(!acct){ toast('Please choose which account this statement is for',true); return; }
+  const send=_acctCtx.send; closeAcctPick(); send(acct);
 }
 function guessCols(header){
   const H=header.map(h=>String(h||'').toLowerCase());
@@ -2041,12 +2111,14 @@ function applyMapping(rows,m){
       if(jIn>=0) signed+=Math.abs(_num(g(r,jIn)));
       if(jOut>=0) signed-=Math.abs(_num(g(r,jOut)));
       if(jFee>=0) signed-=Math.abs(_num(g(r,jFee)));
+      if(jIn<0&&jOut<0&&jAmount>=0) signed+=_num(g(r,jAmount));
       if(signed===0) continue;
+      if(m.flip) signed=-signed;
       type=signed>=0?'Income':'Expense'; amount=Math.abs(signed);
     }else{
-      const a=_num(g(r,jAmount));
+      let a=_num(g(r,jAmount));
       if(jType>=0){ const pt=parseType(g(r,jType)); type=pt.type; refund=pt.refund; amount=Math.abs(a); }
-      else { type=a>=0?'Income':'Expense'; amount=Math.abs(a); }
+      else { if(m.flip) a=-a; type=a>=0?'Income':'Expense'; amount=Math.abs(a); }
     }
     out.push({ date:isoDate(g(r,jDate).split(' ')[0]), description:g(r,jDesc), type,
                allocation:g(r,jAlloc), amount, account:g(r,jAcct), person:g(r,jPerson), notes:g(r,jNotes), refund });
@@ -2094,7 +2166,10 @@ function rowsToTxns(rows){
   return out;
 }
 
-/* ---------- PDF statements (reader loaded on demand, kept out of the file) ---------- */
+/* ---------- PDF statements (reader loaded on demand, kept out of the file) ----------
+   A PDF has no real columns, so we rebuild them from where each number sits on the page.
+   The result is a normal header+rows table, which then follows the same route as CSV and
+   Excel: saved layout → auto-apply; anything new → the column-matching dialog. */
 const PDFJS_URL='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.min.js';
 const PDFJS_WORKER='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.worker.min.js';
 let _pdfLoading=null;
@@ -2112,40 +2187,188 @@ function loadPdfJs(){
 async function importPdf(buf){
   toast('Reading PDF…');
   let lib; try{ lib=await loadPdfJs(); }catch(e){ toast('Could not load the PDF reader (needs internet) — CSV or Excel works best',true); return; }
-  let lines; try{ lines=await pdfToLines(lib,buf); }catch(e){ console.warn(e); toast('Could not read that PDF',true); return; }
-  const txns=pdfLinesToTxns(lines);
-  if(!txns.length){ toast('Couldn’t find transactions in that PDF — try your bank’s CSV or Excel export',true); return; }
-  addImported(txns, 'from PDF, please check them');
+  let t; try{ t=pdfTable(await pdfToLines(lib,buf)); }catch(e){ console.warn(e); toast('Could not read that PDF',true); return; }
+  if(t.rows.length<2){ toast('Couldn’t find transactions in that PDF — try your bank’s CSV or Excel export',true); return; }
+  const accts=state.lists.accounts, l4=t.last4, bank=t.bank.toLowerCase();
+  const byL4=l4?accts.filter(a=>maskAcct(a).endsWith(l4)):[];
+  const byBank=bank?accts.filter(a=>a.toLowerCase().includes(bank.split(' ')[0])):[];
+  beginTabularImport(t.rows,{
+    sig:['pdf',bank,l4,makeSig(t.rows[0])].join('|'), pdf:true, last4:l4,
+    name:[t.bank,l4?'••••'+l4:''].filter(Boolean).join(' '),
+    account:byL4[0]||(byBank.length===1?byBank[0]:''),
+    warn:t.unknownDir?'This PDF doesn’t show which lines are money in and which are money out, so they are all treated as money out for now. Check them on the Import Statement page.':'',
+    note:'from PDF, please check them'
+  });
 }
+/* Each line of text on the page, keeping where each piece of text sits */
 async function pdfToLines(lib,buf){
   const pdf=await lib.getDocument({data:new Uint8Array(buf)}).promise;
   const lines=[];
   for(let p=1;p<=pdf.numPages;p++){
     const page=await pdf.getPage(p); const tc=await page.getTextContent();
-    const byY={};
-    tc.items.forEach(it=>{ const y=Math.round(it.transform[5]); (byY[y]=byY[y]||[]).push([it.transform[4],it.str]); });
-    Object.keys(byY).map(Number).sort((a,b)=>b-a).forEach(y=>{
-      const line=byY[y].sort((a,b)=>a[0]-b[0]).map(a=>a[1]).join(' ').replace(/\s+/g,' ').trim();
-      if(line) lines.push(line);
+    const items=tc.items.filter(it=>it.str&&it.str.trim())
+      .map(it=>({x:it.transform[4],y:it.transform[5],r:it.transform[4]+(it.width||0),str:it.str}))
+      .sort((a,b)=>b.y-a.y);
+    const groups=[];
+    items.forEach(it=>{ const g=groups[groups.length-1]; if(g&&Math.abs(g.y-it.y)<=2) g.items.push(it); else groups.push({y:it.y,items:[it]}); });
+    groups.forEach(g=>{
+      const segs=[];
+      g.items.sort((a,b)=>a.x-b.x).forEach(it=>{
+        const s=segs[segs.length-1];
+        if(s&&it.x-s.r<4){ s.str+=(it.x-s.r>0.5?' ':'')+it.str; s.r=Math.max(s.r,it.r); } else segs.push({x:it.x,r:it.r,str:it.str});
+      });
+      lines.push(segs);
     });
   }
   return lines;
 }
-function pdfLinesToTxns(lines){
-  const dateRe=/(\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/;
-  const numRe=/-?\d[\d ,]*\.\d{2}/g;
-  const out=[];
-  lines.forEach(line=>{
-    const dm=line.match(dateRe); if(!dm) return;
-    const nums=line.match(numRe); if(!nums||!nums.length) return;
-    const amtStr=(nums.length>=2?nums[nums.length-2]:nums[nums.length-1]);
-    const amt=parseFloat(amtStr.replace(/[ ,]/g,'')); if(isNaN(amt)||amt===0) return;
-    let desc=line.slice(line.indexOf(dm[0])+dm[0].length);
-    const fn=desc.search(numRe); if(fn>0) desc=desc.slice(0,fn);
-    out.push({ date:isoDate(dm[0]), description:desc.replace(/\s+/g,' ').trim()||'(imported)',
-               type: amt<0?'Expense':'Income', allocation:'', amount:Math.abs(amt), account:'', person:'', notes:'' });
+const PDF_MONTHS={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+/* Find a date in a line. Returns {index,text,y,m,d}; y is blank when the statement leaves out the year */
+function pdfFindDate(s,from){
+  const re=/(^|[^\d.,])(?:(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})|(\d{1,2})[-/.](\d{1,2})[-/.](\d{4}|\d{2})|(\d{1,2})[ -]([A-Za-z]{3,9})\.?(?:[ ,-]+(\d{4}|\d{2}))?)(?![\d.,]*\d)/g;
+  re.lastIndex=from||0; let m;
+  while((m=re.exec(s))){
+    let y,mo,d;
+    if(m[2]){ y=m[2]; mo=+m[3]; d=+m[4]; }
+    else if(m[5]){ d=+m[5]; mo=+m[6]; y=m[7]; }
+    else { d=+m[8]; mo=PDF_MONTHS[m[9].slice(0,3).toLowerCase()]||0; y=m[10]||''; }
+    if(!mo||mo>12||!d||d>31) continue;
+    if(y&&y.length===2) y='20'+y;
+    return {index:m.index+m[1].length,text:m[0].slice(m[1].length),y,m:mo,d};
+  }
+  return null;
+}
+function pdfBank(text){
+  const banks=[['FNB',/\bfnb\b|first national bank/i],['Standard Bank',/standard bank/i],['Absa',/\babsa\b/i],['Nedbank',/nedbank/i],
+    ['Capitec',/capitec/i],['Investec',/investec/i],['African Bank',/african bank/i],['TymeBank',/tyme\s?bank/i],
+    ['Discovery Bank',/discovery bank/i],['Bidvest Bank',/bidvest bank/i],['Old Mutual',/old mutual/i],['Bank Zero',/bank zero/i],['Sasfin',/sasfin/i]];
+  let best='',at=Infinity;
+  banks.forEach(([n,re])=>{ const m=text.match(re); if(m&&m.index<at){ at=m.index; best=n; } });
+  return best;
+}
+function pdfLast4(text){
+  let m=text.match(/\b(?:account|acct?|card)\.?\s*(?:number|num|no|nr|#)?\.?\s*:?\s*((?:\d[ -]?){6,20})/i);
+  if(m){ const d=m[1].replace(/\D/g,''); if(d.length>=6) return d.slice(-4); }
+  m=text.match(/[*x•]{2,}[\s*x•]*(\d{4})\b/i);
+  return m?m[1]:'';
+}
+function pdfColName(s){
+  const t=String(s||'').toLowerCase();
+  if(/balance/.test(t)) return 'Balance';
+  if(/fee|charge/.test(t)) return 'Fee';
+  if(/money\s*out|debit|withdraw|paid\s*out/.test(t)) return 'Money out';
+  if(/money\s*in|credit|deposit|paid\s*in/.test(t)) return 'Money in';
+  if(/amount|value/.test(t)) return 'Amount';
+  return '';
+}
+/* Turn the lines of a statement into a header+rows table */
+function pdfTable(lines){
+  const texts=lines.map(segs=>segs.map(s=>s.str).join('  '));
+  const allText=texts.join('\n');
+  const result={rows:[],bank:pdfBank(allText),last4:pdfLast4(allText),unknownDir:false};
+  let lastFull=''; // the latest full date on the statement, used for dates with no year
+  texts.forEach(s=>{ let at=0,d; while((d=pdfFindDate(s,at))){ at=d.index+d.text.length;
+    if(d.y){ const iso=`${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`; if(iso>lastFull) lastFull=iso; } } });
+  const numRe=/(^|[^\d.,\/-])(-\s?)?(?:R\s?)?(-\s?)?(\d{1,3}(?:[ , ]\d{3})+|\d+)[.,](\d{2})(?!\d)(-(?!\d)|\s?cr\b|\s?dr\b)?/gi;
+  const parse=limit=>{
+    const parsed=[];
+    lines.forEach((segs,li)=>{
+      let s=texts[li];
+      const dm=pdfFindDate(s,0); if(!dm||dm.index>limit) return;
+      const body=s.slice(0,dm.index)+' '.repeat(dm.text.length)+s.slice(dm.index+dm.text.length);
+      const ms=[...body.matchAll(numRe)].map(m=>({ index:m.index+m[1].length, len:m[0].length-m[1].length,
+        lead:m[2]||m[3]||'', whole:m[4], cents:m[5], mark:(m[6]||'').trim().toLowerCase(), markLen:(m[6]||'').length }));
+      if(!ms.length) return;
+      // only the numbers at the end of the line are amounts; a number inside a description stays in it
+      const keep=[]; let end=body.length;
+      for(let k=ms.length-1;k>=0;k--){ const m=ms[k];
+        if(!/^[\s*#]*$/.test(body.slice(m.index+m.len,end))) break;
+        keep.unshift(m); end=m.index; }
+      if(!keep.length) return;
+      // where each number ends on the page
+      const edge=m=>{ let at=m.index+m.len-m.markLen, pos=0;
+        for(const g of segs){ const len=g.str.length;
+          if(at<=pos+len) return g.x+(g.r-g.x)*((at-pos)/Math.max(len,1));
+          pos+=len+2; }
+        return segs[segs.length-1].r; };
+      const nums=keep.map(m=>({ r:edge(m), v:parseFloat(m.whole.replace(/[ ,\u00a0]/g,'')+'.'+m.cents),
+        neg:!!(m.lead||m.mark==='-'||m.mark==='dr'), cr:m.mark==='cr' }));
+      let desc=body.slice(0,end), d2;
+      desc=desc.replace(/\s+/g,' ').trim();
+      while((d2=pdfFindDate(desc,0))&&d2.index===0) desc=desc.slice(d2.text.length).replace(/^\s*(to\b)?\s*/i,'');
+      let y=dm.y;
+      if(!y){ y=(lastFull||new Date().toISOString()).slice(0,4);
+        const mmdd=`${String(dm.m).padStart(2,'0')}-${String(dm.d).padStart(2,'0')}`;
+        if(lastFull&&`${y}-${mmdd}`>lastFull) y=String(+y-1); }
+      parsed.push({li,date:`${y}-${String(dm.m).padStart(2,'0')}-${String(dm.d).padStart(2,'0')}`,desc,nums});
+    });
+    return parsed;
+  };
+  let parsed=parse(6);
+  if(parsed.length<2) parsed=parse(Infinity);   // some banks put the date in the middle of the line
+  if(!parsed.length) return result;
+
+  // group the numbers into columns by where they end on the page
+  const edges=parsed.flatMap(p=>p.nums.map(n=>n.r)).sort((a,b)=>a-b);
+  const cols=[];
+  edges.forEach(r=>{ const c=cols[cols.length-1]; if(c&&r-c.last<=14){ c.last=r; c.sum+=r; c.n++; } else cols.push({last:r,sum:r,n:1}); });
+  cols.forEach(c=>{ c.r=c.sum/c.n; c.vals=[]; });
+  const colOf=r=>{ let b=0; cols.forEach((c,i)=>{ if(Math.abs(c.r-r)<Math.abs(cols[b].r-r)) b=i; }); return b; };
+  parsed.forEach(p=>{ p.cells=cols.map(()=>null); p.nums.forEach(n=>{ const j=colOf(n.r); p.cells[j]=n; cols[j].vals.push(n); }); });
+
+  // column headings: use the statement's own heading row when there is one
+  const first=parsed[0].li;
+  const isHead=i=>/\bdate\b/i.test(texts[i])&&/amount|debit|credit|balance|money|description|details|transaction/i.test(texts[i])&&!parsed.some(p=>p.li===i);
+  let head=-1; for(let i=first-1;i>=0;i--){ if(isHead(i)){ head=i; break; } }
+  if(head<0) head=texts.findIndex((_,i)=>isHead(i));
+  const names=cols.map(()=>'');
+  if(head>=0){
+    cols.forEach((c,j)=>{ let best=null,dist=45;
+      lines[head].forEach(g=>{ const dd=(c.r>=g.x&&c.r<=g.r+3)?0:Math.min(Math.abs(c.r-g.x),Math.abs(c.r-g.r)); if(dd<dist){ dist=dd; best=g; } });
+      if(best) names[j]=pdfColName(best.str)||best.str.trim(); });
+  }
+  if(names.every(n=>!pdfColName(n))){
+    const n=cols.length, std=n===1?['Amount']:n===2?['Amount','Balance']:n===3?['Money out','Money in','Balance']:null;
+    cols.forEach((c,j)=>{ names[j]=std?std[j]:(j===n-1?'Balance':'Column '+(j+1)); });
+  }
+  names.forEach((n,j)=>{ let k=2,x=n||('Column '+(j+1)); while(names.slice(0,j).includes(x)) x=(n||'Column')+' '+k++; names[j]=x; });
+
+  // signs: "Cr" / "Dr" / a minus decide money in or out; banks that mark only one side imply the other
+  cols.forEach(c=>{ c.hasCr=c.vals.some(n=>n.cr); c.hasNeg=c.vals.some(n=>n.neg); c.marked=c.hasCr||c.hasNeg; });
+  const signed=(n,c)=>n.neg?-n.v:n.cr?n.v:(c.hasCr&&!c.hasNeg)?-n.v:n.v;
+  const iAmt=names.indexOf('Amount'), iBal=names.indexOf('Balance');
+  if(iAmt>=0&&!cols[iAmt].marked&&names.indexOf('Money in')<0&&names.indexOf('Money out')<0){
+    // a single unsigned amount column: work the direction out from how the balance moves
+    let fwd=0,rev=0,pairs=0;
+    const near=(a,b)=>Math.abs(a-b)<0.015;
+    const bal=p=>p.cells[iBal]?signed(p.cells[iBal],cols[iBal]):null, amt=p=>p.cells[iAmt]?p.cells[iAmt].v:null;
+    if(iBal>=0) for(let i=1;i<parsed.length;i++){
+      const a=bal(parsed[i-1]),b=bal(parsed[i]); if(a===null||b===null) continue;
+      pairs++; const d=Math.abs(b-a);
+      if(amt(parsed[i])!==null&&near(d,amt(parsed[i]))) fwd++;
+      if(amt(parsed[i-1])!==null&&near(d,amt(parsed[i-1]))) rev++;
+    }
+    parsed.forEach(p=>{ p.dir=-1; });
+    if(pairs&&Math.max(fwd,rev)>=Math.max(1,pairs/2)){
+      for(let i=1;i<parsed.length;i++){
+        const a=bal(parsed[i-1]),b=bal(parsed[i]); if(a===null||b===null) continue;
+        const p=fwd>=rev?parsed[i]:parsed[i-1], d=b-a;
+        if(amt(p)!==null&&near(Math.abs(d),amt(p))) p.dir=(fwd>=rev?d:-d)>0?1:-1;
+      }
+    } else result.unknownDir=true;
+  }
+  const isBalLine=d=>/\b(opening|closing)\s+balance\b|balance\s+(brought|carried|b\/?f|c\/?f)|\b(brought|carried)\s+forward\b/i.test(d);
+  result.rows=[['Date','Description'].concat(names)];
+  parsed.forEach(p=>{
+    if(isBalLine(p.desc)) return;
+    if(cols.length>1&&p.cells.every((n,j)=>n===null||j===iBal)) return;   // only a balance on this line
+    result.rows.push([p.date,p.desc||'(imported)'].concat(p.cells.map((n,j)=>{
+      if(!n) return '';
+      const v=(j===iAmt&&p.dir)?p.dir*n.v:signed(n,cols[j]);
+      return v.toFixed(2);
+    })));
   });
-  return out;
+  return result;
 }
 
 /* shared helpers: normalise a date, then add imported rows + any new lists */
@@ -2451,8 +2674,9 @@ const MAP_FIELDS=[
   ['notes','Notes', '']
 ];
 let _mapCtx=null;   // { rows, header, sig }
-function openMapDialog(rows,header,sig){
-  _mapCtx={rows,header,sig};
+function openMapDialog(rows,header,sig,meta){
+  meta=meta||{};
+  _mapCtx={rows,header,sig,meta};
   const guess=guessCols(header);
   const opts=(sel)=>['<option value="">— none —</option>']
     .concat(header.map(h=>`<option value="${esc(h)}"${(String(sel).toLowerCase()===String(h).toLowerCase())?' selected':''}>${esc(h)}</option>`)).join('');
@@ -2462,7 +2686,11 @@ function openMapDialog(rows,header,sig){
       `<select class="field" data-mapkey="${key}" onchange="mapPreview()">${opts(guess[key]||'')}</select></label>`;
   }).join('');
   document.getElementById('mapSaveChk').checked=true;
-  document.getElementById('mapSaveName').value='';
+  document.getElementById('mapSaveName').value=meta.name||'';
+  document.getElementById('mapAccount').innerHTML=acctOptions(meta.account||'');
+  const newA=document.getElementById('mapAccountNew'); newA.value=''; newA.style.display='none';
+  document.getElementById('mapFlip').checked=false;
+  const w=document.getElementById('mapWarn'); w.textContent=meta.warn||''; w.style.display=meta.warn?'':'none';
   mapPreview();
   document.getElementById('mapModal').classList.add('show');
 }
@@ -2473,27 +2701,32 @@ function readMapCols(){
 function mapPreview(){
   const box=document.getElementById('mapPreview'); if(!_mapCtx||!box) return;
   const cols=readMapCols();
-  const txns=applyMapping(_mapCtx.rows,{cols});
+  const txns=applyMapping(_mapCtx.rows,{cols,flip:document.getElementById('mapFlip').checked});
   if(!txns.length){ box.innerHTML='<span class="tiny">Map at least a <b>Date</b> and an amount column to see a preview.</span>'; return; }
   const p=txns.slice(0,2).map(t=>`${esc(t.date||'?')} · ${esc((t.description||'').slice(0,32)||'—')} · <b>${t.type}</b> · ${fmt(t.amount)}`).join('<br>');
-  box.innerHTML=`<div class="tiny" style="margin-bottom:4px">Preview — first rows will import as:</div>${p}<div class="tiny" style="margin-top:6px">${txns.length} row(s) will import.</div>`;
+  box.innerHTML=`<div class="tiny" style="margin-bottom:4px">Preview — first rows will import as:</div>${p}<div class="tiny" style="margin-top:6px">${txns.length} row(s) will import · Money in ${fmt(txns.filter(t=>t.type==='Income').reduce((a,t)=>a+t.amount,0))} · Money out ${fmt(txns.filter(t=>t.type!=='Income').reduce((a,t)=>a+t.amount,0))}</div>`;
 }
 function confirmMapping(){
   if(!_mapCtx) return;
   const cols=readMapCols();
   if(!cols.date){ toast('Please choose which column is the Date',true); return; }
   if(!cols.amount && !cols.moneyIn && !cols.moneyOut && !cols.fee){ toast('Map an Amount column, or Money in / Money out',true); return; }
-  const txns=applyMapping(_mapCtx.rows,{cols});
+  const flip=document.getElementById('mapFlip').checked;
+  const txns=applyMapping(_mapCtx.rows,{cols,flip});
   if(!txns.length){ toast('That mapping produced no transactions — check the columns',true); return; }
+  const account=readAcct('mapAccount','mapAccountNew');
+  if(!account && !cols.account){ toast('Please choose which account this statement is for',true); return; }
+  if(account) withAccount(txns,account);
   // save the layout for next time
   if(document.getElementById('mapSaveChk').checked){
     const name=(document.getElementById('mapSaveName').value||'').trim() || 'My bank';
     const sig=_mapCtx.sig;
     state.lists.importMappings = (state.lists.importMappings||[]).filter(m=>m.sig!==sig);
-    state.lists.importMappings.push({ id:uid(), name, sig, cols });
+    state.lists.importMappings.push({ id:uid(), name, sig, cols, account, flip, pdf:!!_mapCtx.meta.pdf });
   }
+  const note=_mapCtx.meta.note;
   closeMap();
-  addImported(txns);
+  addImported(txns,note);
 }
 function removeMapping(id){
   state.lists.importMappings=(state.lists.importMappings||[]).filter(m=>m.id!==id);
@@ -2667,7 +2900,7 @@ function renderSetup(){
   const mb=document.getElementById('mappingsBox');
   if(mb){
     const ms=state.lists.importMappings||[];
-    mb.innerHTML = ms.length ? ms.map(m=>`<div class="acct-line"><span>📄 <b>${esc(m.name)}</b> <span class="tiny">${(m.sig||'').split('|').length} columns</span></span><button class="btn ghost sm" style="margin-left:auto" onclick="removeMapping('${m.id}')">Remove</button></div>`).join('')
+    mb.innerHTML = ms.length ? ms.map(m=>`<div class="acct-line"><span>📄 <b>${esc(m.name)}</b> <span class="tiny">${m.pdf?'PDF':(m.sig||'').split('|').length+' columns'}${m.account?' · '+esc(m.account):''}</span></span><button class="btn ghost sm" style="margin-left:auto" onclick="removeMapping('${m.id}')">Remove</button></div>`).join('')
       : '<p class="tiny">No saved layouts yet. They appear here after you map and save a bank statement during import.</p>';
   }
   const un=document.getElementById('userNameInput'); if(un) un.value=(state.settings&&state.settings.userName)||'';
