@@ -3643,7 +3643,7 @@ function cloudPush(immediate){
       const body=[{ client_id:clientId(), state:cloudStatePayload(), updated_at:new Date().toISOString() }];
       const res=await withAuth(()=>fetch(cfgUrl()+'/rest/v1/client_data',{method:'POST',
         headers:{...restHeaders(),'Prefer':'resolution=merge-duplicates,return=minimal'},
-        body:JSON.stringify(body)}));
+       body:JSON.stringify(body,(k,v)=>typeof v==='string'?v.replace(/\u0000/g,''):v)}));
       setCloud(res.ok?'cloud':'err'); if(!res.ok) console.warn(await res.text());
     }catch(e){ setCloud('err'); }
   };
