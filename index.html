@@ -269,7 +269,7 @@ tr.tot td{font-weight:800; background:var(--accent-soft); border-top:2px solid v
 /* Import Statement (staging) page */
 nav.tabs button .nbadge{display:none; margin-left:6px; min-width:18px; height:18px; padding:0 5px; border-radius:999px; background:var(--expense); color:#fff; font-size:11px; font-weight:800; line-height:18px; text-align:center}
 nav.tabs button .nbadge.show{display:inline-block}
-.st-cards{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px}
+.st-cards{display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:20px}
 .st-card{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; box-shadow:var(--shadow)}
 .st-card .lab{font-size:11.5px; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); font-weight:700}
 .st-card .val{font-size:24px; font-weight:800; margin-top:6px}
@@ -285,6 +285,11 @@ nav.tabs button .nbadge.show{display:inline-block}
 #stTable tr.need-row td:first-child{box-shadow:inset 3px 0 0 var(--expense)}
 .st-tag{display:inline-block; margin:4px 4px 0 0; padding:1px 7px; border-radius:999px; font-size:11px; font-weight:700}
 .st-tag.sug{background:var(--chip); color:var(--brand)}
+.st-tag.pair{background:var(--transfer-soft); color:var(--transfer)}
+.st-unpair{border:none; background:none; color:var(--muted); text-decoration:underline; font-size:11px; font-weight:600; padding:0 2px; cursor:pointer}
+.st-unpair:hover{color:var(--expense)}
+.st-card.pair .val{color:var(--transfer)}
+tr.pair-row td:first-child{box-shadow:inset 3px 0 0 var(--transfer)}
 .st-tag.dup{background:var(--deduction-soft); color:var(--deduction)}
 .st-yes{display:flex; align-items:center; gap:5px; font-size:12.5px; font-weight:700; white-space:nowrap}
 .banner{display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:12px 16px; margin-bottom:16px; border-radius:var(--radius); border:1px solid var(--deduction); background:var(--deduction-soft); font-size:13.5px}
@@ -670,7 +675,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
       <div class="filters no-print">
         <div class="fx"><label>Search</label><input class="field" id="stSearch" placeholder="Description, notes…" oninput="renderStaging()" style="min-width:180px"></div>
         <div class="fx"><label>Show</label><select class="field" id="stShow" onchange="renderStaging()">
-          <option value="all">All</option><option value="need">Needs allocation</option><option value="notyes">Not ticked yet</option><option value="yes">Ticked Yes</option><option value="dup">Possible duplicates</option>
+          <option value="all">All</option><option value="need">Needs allocation</option><option value="notyes">Not ticked yet</option><option value="yes">Ticked Yes</option><option value="dup">Possible duplicates</option><option value="pair">Matched transfers</option>
         </select></div>
         <div class="fx"><label>Type</label><select class="field" id="stType" onchange="stTypeFilterChanged()"><option>All</option><option>Income</option><option>Expense</option><option>Deduction</option><option>Debt Repayment</option><option>Transfer</option></select></div>
         <div class="fx"><label>Allocation</label><select class="field" id="stAlloc" onchange="renderStaging()"></select></div>
@@ -2744,22 +2749,111 @@ function stDupInfo(){
 }
 function stDir(r){ return r.dir||(r.type==='Income'?'in':'out'); }
 /* The same transfer seen on both statements: find the second copy so it isn't captured twice */
-function stPairs(){
-  const out={}, rows=stg().filter(r=>r.type==='Transfer'), used=new Set();
-  const near=(a,b)=>Math.abs(new Date(a)-new Date(b))<=3*864e5;
-  const same=(a,b)=>Math.abs(Math.abs(Number(a))-Math.abs(Number(b)))<0.005;
-  rows.forEach(r=>{
-    const t=state.transactions.find(x=>x.type==='Transfer'&&!used.has(x.id)&&same(x.amount,r.amount)&&near(x.date,r.date)&&(
-      stDir(r)==='in' ? (x.toAccount===r.account||(!x.toAccount&&x.account!==r.account))
-                      : (!x.account&&x.toAccount!==r.account)));
-    if(t){ used.add(t.id); out[r.id]={txn:t.id}; }
-  });
-  rows.filter(r=>stDir(r)==='in'&&!out[r.id]).forEach(r=>{
-    const o=rows.find(x=>stDir(x)==='out'&&!out[x.id]&&!used.has(x.id)&&x.account!==r.account&&same(x.amount,r.amount)&&near(x.date,r.date));
-    if(o){ used.add(o.id); out[r.id]={row:o.id}; }
-  });
-  return out;
+/* ============ TRANSFER MATCHING ============
+   A transfer between two of your own accounts shows on BOTH statements: money out of one, money in to the other.
+   Lines are matched on the money, not the wording: one line out and one line in, on two different accounts
+   of yours, the same amount, within 3 days. A matched pair is saved as ONE Transfer (From -> To).
+   r.pair    = id of the other staged line
+   r.pairTxn = id of an already-saved transaction that is the other side
+   r.noPair  = the person said "Not a transfer", so never match this line again */
+const PAIR_DAYS=3;
+function ownAcct(a){ a=String(a||'').toLowerCase(); return !!a && state.lists.accounts.some(x=>x.toLowerCase()===a); }
+function pNear(a,b){ const d=Math.abs(new Date(a)-new Date(b)); return !isNaN(d) && d<=PAIR_DAYS*864e5; }
+function pSame(a,b){ return Math.abs(Math.abs(Number(a))-Math.abs(Number(b)))<0.005; }
+function pDays(a,b){ return Math.abs(new Date(a)-new Date(b)); }
+function pairAlloc(a,b,keep){
+  if(keep) return keep;
+  const k=[acctInfo(a).kind,acctInfo(b).kind];
+  if(k.includes('Credit card')) return CARD_PAY;
+  if(k.includes('Cash')) return 'Cash withdrawal';
+  return 'Account to account';
 }
+function pMark(r,other,alloc){
+  if(r.preType===undefined){ r.preType=r.type; r.preAlloc=r.allocation||''; }
+  r.type='Transfer'; r.allocation=alloc; r.other=other; r.suggested=true;
+}
+function pRestore(r){
+  if(r.preType!==undefined){ if(r.type==='Transfer'){ r.type=r.preType; r.allocation=r.preAlloc; } }
+  else if(r.type==='Transfer'){ r.type=stDir(r)==='in'?'Income':'Expense'; r.allocation=''; }
+  delete r.preType; delete r.preAlloc; r.other=''; r.suggested=false;
+  if(r.ready && !stComplete(r)) r.ready=false;
+}
+// break a match. noPair=true when the person says it isn't a transfer.
+function pBreak(r,noPair,keepType){
+  const p=r.pair?stFind(r.pair):null;
+  [r,p].forEach(x=>{ if(!x) return; delete x.pair; delete x.pairTxn; delete x.pairConvert; if(noPair) x.noPair=true;
+    if(!(keepType && x===r)) pRestore(x); else { delete x.preType; delete x.preAlloc; } });
+  if(!p){ delete r.pairTxn; delete r.pairConvert; }
+}
+function stTxnMatches(r,t){
+  if(!dateEditable(t.date) || !pSame(t.amount,r.amount) || !pNear(t.date,r.date)) return false;
+  const A=r.account, inn=stDir(r)==='in';
+  if(t.type==='Transfer') return inn ? (t.toAccount===A || (!t.toAccount && !!t.account && t.account!==A))
+                                     : (t.account===A || (!t.account && !!t.toAccount && t.toAccount!==A));
+  if(!ownAcct(t.account) || t.account===A) return false;
+  return inn ? (t.type==='Expense' && !t.refund) : t.type==='Income';
+}
+function stAutoPair(){
+  let changed=false; const rows=stg(), byId={}; rows.forEach(r=>byId[r.id]=r);
+  // 1) tidy up matches that no longer hold
+  rows.forEach(r=>{
+    if(r.pair){
+      const p=byId[r.pair];
+      if(!p || p.pair!==r.id){ pRestore(r); delete r.pair; changed=true; return; }
+      if(r.type!=='Transfer'||p.type!=='Transfer'){ pBreak(r.type!=='Transfer'?r:p,true,true); changed=true; return; }
+      if(!pSame(r.amount,p.amount)||!pNear(r.date,p.date)||r.account===p.account||stDir(r)===stDir(p)){ pBreak(r,false); changed=true; }
+    } else if(r.pairTxn){
+      const t=state.transactions.find(x=>x.id===r.pairTxn);
+      if(r.type!=='Transfer'){ pBreak(r,true,true); changed=true; return; }
+      if(!t || !stTxnMatches(r,t)){ pBreak(r,false); changed=true; }
+    }
+  });
+  const free=r=>!r.pair && !r.pairTxn && !r.noPair && r.date && Number(r.amount)>0 && ownAcct(r.account);
+  // 2) one line out + one line in, both in this review
+  rows.filter(r=>free(r)&&stDir(r)!=='in').sort((a,b)=>a.date<b.date?-1:1).forEach(o=>{
+    if(!free(o)) return;
+    const c=rows.filter(i=>free(i)&&stDir(i)==='in'&&i.account!==o.account&&pSame(i.amount,o.amount)&&pNear(i.date,o.date))
+                .sort((a,b)=>pDays(a.date,o.date)-pDays(b.date,o.date))[0];
+    if(!c) return;
+    const keep=(o.type==='Transfer'&&o.allocation)||(c.type==='Transfer'&&c.allocation)||'';
+    const al=pairAlloc(o.account,c.account,keep);
+    o.pair=c.id; c.pair=o.id; pMark(o,c.account,al); pMark(c,o.account,al); changed=true;
+  });
+  // 3) a line whose other side is already saved in Transactions
+  const used=new Set(rows.filter(r=>r.pairTxn).map(r=>r.pairTxn));
+  rows.filter(free).forEach(r=>{
+    const c=state.transactions.filter(t=>!used.has(t.id)&&stTxnMatches(r,t)).sort((a,b)=>
+      (a.type==='Transfer'?0:1)-(b.type==='Transfer'?0:1) || pDays(a.date,r.date)-pDays(b.date,r.date))[0];
+    if(!c) return;
+    used.add(c.id); r.pairTxn=c.id; r.pairConvert=c.type!=='Transfer';
+    const other=stDir(r)==='in' ? (c.type==='Transfer'?(c.account||''):c.account) : (c.type==='Transfer'?(c.toAccount||''):c.account);
+    const keep=(c.type==='Transfer'&&c.allocation)||(r.type==='Transfer'&&r.allocation)||'';
+    pMark(r,other,pairAlloc(r.account,other,keep)); changed=true;
+  });
+  return changed;
+}
+function stPairTag(r){
+  if(r.pair){
+    const p=stFind(r.pair); if(!p) return '';
+    const from=stDir(r)==='in'?p.account:r.account, to=stDir(r)==='in'?r.account:p.account;
+    return `<span class="st-tag pair">⇄ Matched transfer: ${esc(maskAcct(from))} → ${esc(maskAcct(to))}. Saved as one line</span><button class="st-unpair" onclick="stUnpair('${r.id}')">Not a transfer</button>`;
+  }
+  if(r.pairTxn){
+    const t=state.transactions.find(x=>x.id===r.pairTxn); if(!t) return '';
+    let msg;
+    if(r.pairConvert) msg=`⇄ Matches a saved ${esc(t.type)} on ${esc(maskAcct(t.account))} (${esc(t.date)}). Both become one transfer`;
+    else if(stDir(r)==='in' ? t.toAccount===r.account : t.account===r.account) msg='⇄ This transfer is already saved. This line will be left out';
+    else msg=`⇄ Other side of a saved transfer (${esc(t.date)}). It completes that one`;
+    return `<span class="st-tag pair">${msg}</span><button class="st-unpair" onclick="stUnpair('${r.id}')">Not a transfer</button>`;
+  }
+  return '';
+}
+function stUnpair(id){
+  const r=stFind(id); if(!r) return;
+  pBreak(r,true,false); save(); renderStaging();
+  toast('Unmatched. Choose a type and allocation for each line');
+}
+function stPartner(r){ return r.pair?stFind(r.pair):null; }
 function stAllocsFor(type){
   const base = type && type!=='All' ? (state.lists.allocations[type]||[]) : allAllocations();
   const extra = stg().filter(r=>r.allocation && (!type||type==='All'||r.type===type)).map(r=>r.allocation);
@@ -2804,11 +2898,13 @@ function stFiltered(dups){
     if(sh==='notyes' && r.ready) return false;
     if(sh==='yes' && !r.ready) return false;
     if(sh==='dup' && !(d.tx||d.rep)) return false;
+    if(sh==='pair' && !(r.pair||r.pairTxn)) return false;
     return true;
   });
 }
 function renderStaging(){
-  const all=stg(), dups=stDupInfo(), pairs=stPairs();
+  if(stAutoPair()) save();
+  const all=stg(), dups=stDupInfo();
   // allocation filter follows the chosen type
   const ty=document.getElementById('stType').value, alEl=document.getElementById('stAlloc'), curAl=alEl.value||'All';
   const als=stAllocsFor(ty);
@@ -2820,11 +2916,13 @@ function renderStaging(){
   const yes=all.filter(r=>r.ready);
   const inn=sum(yes.filter(r=>stDir(r)==='in').map(r=>r.amount)), out=sum(yes.filter(r=>stDir(r)!=='in').map(r=>r.amount));
   const nd=all.filter(r=>dups[r.id].tx||dups[r.id].rep).length;
+  const np=all.filter(r=>r.pair).length/2 + all.filter(r=>r.pairTxn).length;
   document.getElementById('stCards').innerHTML=`
     <div class="st-card"><div class="lab">In review</div><div class="val num">${all.length}</div><div class="sub">lines waiting</div></div>
     <div class="st-card warn"><div class="lab">Need allocation</div><div class="val num">${need}</div><div class="sub">outlined in red</div></div>
     <div class="st-card ok"><div class="lab">Ticked Yes</div><div class="val num">${yes.length}</div><div class="sub">In ${fmt(inn)} · Out ${fmt(out)}</div></div>
-    <div class="st-card dup"><div class="lab">Possible duplicates</div><div class="val num">${nd}</div><div class="sub">check before moving</div></div>`;
+    <div class="st-card dup"><div class="lab">Possible duplicates</div><div class="val num">${nd}</div><div class="sub">check before moving</div></div>
+    <div class="st-card pair"><div class="lab">Matched transfers</div><div class="val num">${np}</div><div class="sub">between your own accounts</div></div>`;
 
   const rows=stFiltered(dups).slice().sort((a,b)=>(a.date<b.date?1:a.date>b.date?-1:0));
   const body=document.getElementById('stBody');
@@ -2838,9 +2936,9 @@ function renderStaging(){
       const d=dups[r.id], noAl=!(r.allocation||'').trim(), ok=stComplete(r);
       const tags=(r.suggested?'<span class="st-tag sug">✨ Suggested</span>':'')+
         (d.tx?'<span class="st-tag dup">⚠ Already in Transactions</span>':'')+(d.rep?'<span class="st-tag dup">⚠ Repeated in this review</span>':'')+
-        (pairs[r.id]?'<span class="st-tag dup">⇄ Other side of a transfer, will be left out</span>':'')+
+        stPairTag(r)+
         (r.type==='Expense'&&stDir(r)==='in'?'<span class="st-tag sug">↩ Refund</span>':'');
-      return `<tr class="${noAl?'need-row':''}">
+      return `<tr class="${noAl?'need-row':''}${(r.pair||r.pairTxn)?' pair-row':''}">
         <td><input type="checkbox" class="stsel" data-id="${r.id}" onchange="stSelChanged()"></td>
         <td><label class="st-yes" title="${ok?'Tick when this line is ready':'Needs a date, an amount above 0 and an allocation'}"><input type="checkbox" ${r.ready?'checked':''} ${ok?'':'disabled'} onchange="stSetReady('${r.id}',this.checked)">Yes</label></td>
         <td><input class="st-in" type="date" value="${esc(r.date||'')}" onchange="stEdit('${r.id}','date',this.value)"></td>
@@ -2848,7 +2946,7 @@ function renderStaging(){
         <td><select class="st-in" onchange="stEdit('${r.id}','type',this.value)">${TYPES.map(t=>`<option${t===r.type?' selected':''}>${t}</option>`).join('')}</select></td>
         <td><select class="st-in ${noAl?'need':''}" onchange="stAllocPicked('${r.id}',this)">${stOpts(stAllocsFor(r.type), r.allocation, '— choose —')}<option value="__new">＋ New allocation…</option></select></td>
         <td><input class="st-in num" style="text-align:right" type="number" min="0" step="0.01" value="${(Number(r.amount)||0).toFixed(2)}" onchange="stEdit('${r.id}','amount',this.value)"></td>
-        <td><select class="st-in" onchange="stEdit('${r.id}','account',this.value)">${stOpts(accts, r.account)}</select>${r.type==='Transfer'?`<div class="st-to">${stDir(r)==='in'?'from':'to'}<select class="st-in" onchange="stEdit('${r.id}','other',this.value)">${stOpts(accts.filter(a=>a!==r.account), r.other||'', '— not in EZ-Fin —')}</select></div>`:''}</td>
+        <td><select class="st-in" onchange="stEdit('${r.id}','account',this.value)">${stOpts(accts, r.account)}</select>${(r.type==='Transfer'&&!r.pair&&!r.pairTxn)?`<div class="st-to">${stDir(r)==='in'?'from':'to'}<select class="st-in" onchange="stEdit('${r.id}','other',this.value)">${stOpts(accts.filter(a=>a!==r.account), r.other||'', '— not in EZ-Fin —')}</select></div>`:''}</td>
         <td><select class="st-in" onchange="stEdit('${r.id}','person',this.value)">${stOpts(pers, r.person)}</select></td>
         <td><input class="st-in" value="${esc(r.notes||'')}" placeholder="—" onchange="stEdit('${r.id}','notes',this.value)"></td>
       </tr>`;
@@ -2879,20 +2977,22 @@ function stAllocPicked(id, sel){
 function stSetReady(id, on){
   const r=stFind(id); if(!r) return;
   if(on && !stComplete(r)){ toast('Add a date, an amount and an allocation first',true); renderStaging(); return; }
-  r.ready=!!on; save(); renderStaging();
+  r.ready=!!on;
+  const p=stPartner(r); if(p && (!on || stComplete(p))) p.ready=!!on;
+  save(); renderStaging();
 }
 function stSelIds(){ return [...document.querySelectorAll('.stsel:checked')].map(c=>c.dataset.id); }
 function stSelChanged(){ const n=stSelIds().length; document.querySelectorAll('.stsel-btn').forEach(b=>b.disabled=n===0); }
 function stSelectAll(on){ document.querySelectorAll('.stsel').forEach(c=>c.checked=on); stSelChanged(); }
 function stTickSelected(on){
   const ids=stSelIds(); let n=0, skip=0;
-  stg().forEach(r=>{ if(ids.includes(r.id)){ if(on && !stComplete(r)){ skip++; return; } r.ready=on; n++; } });
+  stg().forEach(r=>{ if(ids.includes(r.id)){ if(on && !stComplete(r)){ skip++; return; } r.ready=on; n++; const p=stPartner(r); if(p && (!on||stComplete(p))) p.ready=on; } });
   save(); renderStaging();
   toast(on ? `Ticked ${n} line(s)`+(skip?` · ${skip} skipped (incomplete)`:'') : `Unticked ${n} line(s)`, on&&skip>0&&n===0);
 }
 function stTickAllReady(){
   const rows=stFiltered(); let n=0, skip=0;
-  rows.forEach(r=>{ if(stComplete(r)){ if(!r.ready){ r.ready=true; n++; } } else skip++; });
+  rows.forEach(r=>{ if(stComplete(r)){ if(!r.ready){ r.ready=true; n++; } const p=stPartner(r); if(p && stComplete(p)) p.ready=true; } else skip++; });
   save(); renderStaging();
   toast(`Ticked ${n} line(s) as ready`+(skip?` · ${skip} skipped (missing date, amount or allocation)`:''));
 }
@@ -2915,18 +3015,36 @@ function stMoveTicked(){
   if(blocked && !confirm(`${blocked} ticked line(s) are dated in a closed or not-yet-started year and will stay here. Move the other ${ticked.length}?`)) return;
   const nd=ticked.filter(r=>dups[r.id].tx||dups[r.id].rep).length;
   if(nd && !confirm(`${nd} of the ticked line(s) look like duplicates. Move them anyway?`)) return;
-  let skippedLists=0, paired=0;
-  // the second copy of a transfer: complete the first copy and leave this one out
-  const pairs=stPairs(), tickedIds=new Set(ticked.map(r=>r.id)), left=new Set();
+  stAutoPair();
+  let skippedLists=0, paired=0, waiting=0;
+  const tickedIds=new Set(ticked.map(r=>r.id)), left=new Set(), done=new Set();
+  // a matched pair needs both lines ticked; otherwise both stay here
+  ticked.forEach(r=>{ const p=stPartner(r); if(p && !tickedIds.has(p.id)){ left.add(r.id); done.add(r.id); waiting++; } });
+  const conv=ticked.filter(r=>r.pairTxn&&r.pairConvert&&!done.has(r.id)).length;
+  if(conv && !confirm(`${conv} line(s) match an Income or Expense already saved on another of your accounts.\n\nEach pair will become one transfer, so it is no longer counted as income or spending. Continue?`)) return;
+  const addAlloc=(type,al)=>{ const L=state.lists.allocations[type]||(state.lists.allocations[type]=[]); if(al && !L.some(a=>a.toLowerCase()===al.toLowerCase())) L.push(al); };
   ticked.forEach(r=>{
-    const p=pairs[r.id]; if(!p) return;
-    if(p.txn){ const t=state.transactions.find(x=>x.id===p.txn);
-      if(stDir(r)==='in'){ if(!t.toAccount) t.toAccount=r.account; } else { t.account=r.account; }
-      left.add(r.id); paired++; }
-    else if(tickedIds.has(p.row)){ const o=stFind(p.row); if(!o.other) o.other=r.account; left.add(r.id); paired++; }
-  });
-  ticked.forEach(r=>{
-    if(left.has(r.id)) return;
+    if(done.has(r.id)) return;
+    const p=stPartner(r);
+    if(p){   // two staged lines -> one transfer
+      const o=stDir(r)==='in'?p:r, i=stDir(r)==='in'?r:p;
+      addAlloc('Transfer',o.allocation);
+      state.transactions.push({ id:uid(), date:o.date, description:o.description||i.description, type:'Transfer', allocation:o.allocation,
+        amount:Math.abs(Number(o.amount))||0, account:o.account, toAccount:i.account, person:o.person||i.person,
+        notes:[o.notes,i.notes].filter(Boolean).join(' · ') });
+      [o,i].forEach(x=>{ done.add(x.id); left.add(x.id); }); paired++; return;
+    }
+    if(r.pairTxn){   // other side already saved -> update that one, leave this line out
+      const t=state.transactions.find(x=>x.id===r.pairTxn);
+      if(t){
+        if(t.type!=='Transfer'){
+          const B=t.account; t.type='Transfer'; delete t.refund; t.allocation=r.allocation; addAlloc('Transfer',r.allocation);
+          if(stDir(r)==='in'){ t.account=B; t.toAccount=r.account; } else { t.account=r.account; t.toAccount=B; }
+        } else if(stDir(r)==='in'){ if(!t.toAccount) t.toAccount=r.account; }
+        else { if(!t.account) t.account=r.account; }
+        left.add(r.id); done.add(r.id); paired++; return;
+      }
+    }
     const L=state.lists.allocations[r.type]||(state.lists.allocations[r.type]=[]);
     if(!L.some(a=>a.toLowerCase()===r.allocation.toLowerCase())) L.push(r.allocation);
     if(r.account && !state.lists.accounts.some(a=>a.toLowerCase()===r.account.toLowerCase())){
@@ -2942,10 +3060,12 @@ function stMoveTicked(){
     }
     state.transactions.push(rec);
   });
-  const ids=new Set(ticked.map(r=>r.id));
+  const ids=new Set(ticked.map(r=>r.id).filter(id=>!left.has(id)||done.has(id)));
+  ticked.forEach(r=>{ if(left.has(r.id) && stPartner(r) && !tickedIds.has(stPartner(r).id)) ids.delete(r.id); });
   state.staging=stg().filter(r=>!ids.has(r.id));
   save(); render();
-  toast(`Moved ${ticked.length-paired} line(s) to Transactions`+(paired?` · ${paired} matched to the other side of a transfer`:'')+(skippedLists?' · Setup list limit reached for some accounts/people':''));
+  const moved=ticked.length-[...left].filter(id=>tickedIds.has(id)).length;
+  toast(`Moved ${moved} line(s) to Transactions`+(paired?` · ${paired} transfer${paired!==1?'s':''} saved once`:'')+(waiting?` · ${waiting} matched line(s) kept: tick both sides`:'')+(skippedLists?' · Setup list limit reached for some accounts/people':''));
 }
 
 /* ---------- Column-matching dialog (map a bank layout once, save it) ---------- */
