@@ -93,9 +93,11 @@ nav.tabs button.active{color:var(--navy); border-bottom-color:var(--brand-2)}
 [data-theme="dark"] nav.tabs button.active{color:var(--accent)}
 
 main{padding:22px; max-width:1220px; width:100%; margin:0 auto; flex:1}
-/* Transactions, Import Statement and Reports use the full screen width so the tables are easier to read */
+/* Transactions, Import Statement, Budget and Reports use the full screen width so the tables are easier to read */
 main.wide{max-width:1920px; padding-left:28px; padding-right:28px}
 main.wide .table-scroll{max-height:72vh}
+main.wide .budget-tbl input{width:100%; min-width:74px}
+main.wide .budget-tbl td:first-child{min-width:200px}
 main.wide #stTable td:nth-child(4){min-width:380px}
 main.wide #stTable td:nth-child(7){width:120px}
 main.wide #txTable td:nth-child(3){min-width:320px}
@@ -3993,7 +3995,7 @@ create policy "change own" on public.app_state for update using (auth.uid() = us
    RENDER ROUTER
    ============================================================ */
 function activeView(){ const b=document.querySelector('#nav button.active'); return b?b.dataset.view:'dashboard'; }
-const WIDE_VIEWS=['transactions','staging','reports'];
+const WIDE_VIEWS=['transactions','staging','budget','reports'];
 function render(){
   const mn=document.querySelector('main'); if(mn) mn.classList.toggle('wide', WIDE_VIEWS.includes(activeView()));
   refreshDropdowns();
