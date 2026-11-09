@@ -764,7 +764,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
       </div>
       <div class="grid g3" style="margin-bottom:16px">
         <div class="card pad"><div class="tiny">Taxable income (gross)</div><div class="num" id="taxGross" style="font-size:22px; font-weight:800; color:var(--income); margin-top:4px"></div></div>
-        <div class="card pad"><div class="tiny">Total tax paid</div><div class="num" id="taxPaid" style="font-size:22px; font-weight:800; color:var(--deduction); margin-top:4px"></div></div>
+        <div class="card pad"><div class="tiny">Total tax paid <span title="PAYE and SARS payments, less SARS refunds">(after refunds)</span></div><div class="num" id="taxPaid" style="font-size:22px; font-weight:800; color:var(--deduction); margin-top:4px"></div></div>
         <div class="card pad"><div class="tiny">Total claimable</div><div class="num" id="taxDed" style="font-size:22px; font-weight:800; color:var(--brand); margin-top:4px"></div></div>
       </div>
       <div class="card">
@@ -1235,7 +1235,7 @@ break;case"<bookViews":;case"<bookViews>":;case"</bookViews>":break;case"<workbo
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const FY = ['Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb']; // SA financial year
 const TYPES = ['Income','Expense','Deduction','Debt Repayment','Transfer'];
-const SCHEMA = 2;
+const SCHEMA = 3;
 const CARD_PAY = 'Credit card payment';
 const CUR = 'R';
 const CURRENCIES=[
@@ -1331,11 +1331,12 @@ function normalizeState(){
   maskAllAccounts();
   ensureYears();
   migrateV2();
+  migrateV3();
 }
 /* Version 2 data: adds the Debt Repayment and Transfer types. Closed years are never touched.
    Credit card payments are NOT moved here: that depends on the person's answer (see cardAnswer). */
 function migrateV2(){
-  if((state.schema||1)>=SCHEMA) return;
+  if((state.schema||1)>=2) return;
   try{ if(!localStorage.getItem('pfm_backup_v1')) localStorage.setItem('pfm_backup_v1',JSON.stringify(state)); }catch(e){}
   const L=state.lists.allocations;
   const has=(list,a)=>list.some(x=>x.toLowerCase()===a.toLowerCase());
@@ -1360,7 +1361,22 @@ function migrateV2(){
   state.budgets=nb;
   const cm=state.lists.claimable||{};
   Object.keys(cm).forEach(k=>{ const [ty,a]=k.split('::'); const n=ty==='Expense'&&newType(a||''); if(n) cm[n+'::'+a]=cm[k]; });
-  state.schema=SCHEMA;
+  state.schema=2;
+}
+/* Version 3 data: a SARS refund is a Deduction refund (it lowers tax paid), not Income.
+   Converts Income lines allocated "SARS refund" / "Tax refund" in open years. Closed years are never touched. */
+const TAX_REFUND_ALLOC=/^(sars|income tax|tax)\s*refund$/i;
+function migrateV3(){
+  if((state.schema||1)>=3) return;
+  try{ if(!localStorage.getItem('pfm_backup_v2')) localStorage.setItem('pfm_backup_v2',JSON.stringify(state)); }catch(e){}
+  const L=state.lists.allocations;
+  if(!(L.Deduction||(L.Deduction=[])).some(a=>a.toLowerCase()==='tax')) L.Deduction.push('Tax');
+  const conv=t=>{ if(t.type==='Income' && TAX_REFUND_ALLOC.test(String(t.allocation||'').trim())){ t.type='Deduction'; t.allocation='Tax'; t.refund=true; } };
+  (state.transactions||[]).concat(state.archived||[]).forEach(t=>{ if(yearStatus(fyStartOf(t.date))!=='closed') conv(t); });
+  (state.staging||[]).forEach(conv);
+  const still=a=>(state.transactions||[]).concat(state.archived||[]).some(t=>t.type==='Income'&&t.allocation===a);
+  L.Income=(L.Income||[]).filter(a=>!TAX_REFUND_ALLOC.test(a)||still(a));
+  state.schema=3;
 }
 
 /* ---------- sample data (opens populated) ---------- */
@@ -1546,8 +1562,8 @@ function closeYear(y){
 /* ---------- helpers ---------- */
 function uid(){ return 't_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 function monthOf(d){ const dt=new Date(d+'T00:00:00'); return isNaN(dt)?'':MONTHS[dt.getMonth()]; }
-function isRefund(t){ return t.type==='Expense' && t.refund===true; }
-// Amount for totals of its own type: a refund reduces its expense
+function isRefund(t){ return (t.type==='Expense'||t.type==='Deduction') && t.refund===true; }
+// Amount for totals of its own type: a refund reduces its expense or deduction (e.g. a SARS refund lowers Tax)
 function netAmt(t){ return isRefund(t) ? -Math.abs(t.amount) : Math.abs(t.amount); }
 function sumType(rows,type){ return sum(rows.filter(t=>t.type===type).map(netAmt)); }
 // Amount as shown on a line: money out is negative. Transfers show as moved (no sign).
@@ -1950,7 +1966,7 @@ function updateTxnMode(){
   const ac=document.getElementById('amtCur'); if(ac) ac.textContent=curSym();
   document.getElementById('singleFields').style.display = ps?'none':'';
   document.getElementById('payslipBox').style.display   = ps?'':'none';
-  document.getElementById('refundRow').style.display = pendingType==='Expense'?'':'none';
+  document.getElementById('refundRow').style.display = (pendingType==='Expense'||pendingType==='Deduction')?'':'none';
   document.getElementById('interestRow').style.display = (pendingType==='Debt Repayment'&&!editingId)?'':'none';
   document.getElementById('toRow').style.display = pendingType==='Transfer'?'':'none';
   document.getElementById('tAccountLbl').textContent = pendingType==='Transfer'?'From account':'Paid from';
@@ -2028,7 +2044,7 @@ function saveTxn(){
     person:document.getElementById('tPerson').value, notes:document.getElementById('tNotes').value.trim()
   };
   if(toAcct) rec.toAccount=toAcct;
-  if(pendingType==='Expense'&&document.getElementById('tRefund').checked) rec.refund=true;
+  if((pendingType==='Expense'||pendingType==='Deduction')&&document.getElementById('tRefund').checked) rec.refund=true;
   if(interest>0){
     const L=state.lists.allocations.Expense; if(!L.includes('Loan interest')) L.push('Loan interest');
     state.transactions.push({ id:uid(), date, description:rec.description?rec.description+' (interest)':'Loan interest', type:'Expense',
@@ -2264,7 +2280,7 @@ function exportCsv(y){
   if(y===undefined||y===null||typeof y==='object') y=activeYear();
   const head=['Date','Description','Type','Allocation','Amount','Account','Person','Month','Notes'];
   const lines=[head.join(',')].concat(yearTxns(y).map(t=>
-    [t.date,q(t.description),isRefund(t)?'Expense refund':t.type,q(t.allocation),signed(t),q(t.account),q(t.person),monthOf(t.date),q(t.notes)].join(',')));
+    [t.date,q(t.description),isRefund(t)?t.type+' refund':t.type,q(t.allocation),signed(t),q(t.account),q(t.person),monthOf(t.date),q(t.notes)].join(',')));
   dl(`ezfin-transactions-${fyLabel(y).replace('/','-')}.csv`, lines.join('\n'));
   function q(s){ s=(s==null?'':String(s)); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }
 }
@@ -2304,6 +2320,7 @@ function importRows(rows){ beginTabularImport(rows); }
 function parseType(v){
   const s=String(v||'').trim().toLowerCase();
   if(s==='expense refund'||s==='refund') return {type:'Expense',refund:true};
+  if(s==='deduction refund') return {type:'Deduction',refund:true};
   return {type:TYPES.find(t=>t.toLowerCase()===s)||'Expense',refund:false};
 }
 function _num(x){ x=String(x==null?'':x).replace(/[^0-9.\-]/g,''); const n=parseFloat(x); return isNaN(n)?0:n; }
@@ -2675,6 +2692,9 @@ function isoDate(s){
 /* Bank wording that tells us what a line is. Only a suggestion: the person checks it before moving it. */
 function autoRule(desc,dir,acct){
   const s=String(desc||'').toLowerCase(), kind=acctInfo(acct||'').kind;
+  // SARS: money out = tax paid, money in = tax refund. Both are the Deduction "Tax".
+  if(kind!=='Credit card' && /\bsars\b|income tax|provisional tax|e-?filing/.test(s) && !/\bvat\b/.test(s))
+    return {type:'Deduction',allocation:'Tax',first:true};
   if(kind==='Credit card'){
     if(dir==='in'){
       if(/refund|reversal|cash ?back/.test(s)) return {type:'Expense',allocation:'',first:true};
@@ -2808,7 +2828,7 @@ function stAutoPair(){
       if(!t || !stTxnMatches(r,t)){ pBreak(r,false); changed=true; }
     }
   });
-  const free=r=>!r.pair && !r.pairTxn && !r.noPair && r.date && Number(r.amount)>0 && ownAcct(r.account);
+  const free=r=>!r.pair && !r.pairTxn && !r.noPair && r.type!=='Deduction' && r.date && Number(r.amount)>0 && ownAcct(r.account);
   // 2) one line out + one line in, both in this review
   rows.filter(r=>free(r)&&stDir(r)!=='in').sort((a,b)=>a.date<b.date?-1:1).forEach(o=>{
     if(!free(o)) return;
@@ -2937,7 +2957,7 @@ function renderStaging(){
       const tags=(r.suggested?'<span class="st-tag sug">✨ Suggested</span>':'')+
         (d.tx?'<span class="st-tag dup">⚠ Already in Transactions</span>':'')+(d.rep?'<span class="st-tag dup">⚠ Repeated in this review</span>':'')+
         stPairTag(r)+
-        (r.type==='Expense'&&stDir(r)==='in'?'<span class="st-tag sug">↩ Refund</span>':'');
+        ((r.type==='Expense'||r.type==='Deduction')&&stDir(r)==='in'?`<span class="st-tag sug">↩ ${r.type==='Deduction'?'Tax refund':'Refund'}</span>`:'');
       return `<tr class="${noAl?'need-row':''}${(r.pair||r.pairTxn)?' pair-row':''}">
         <td><input type="checkbox" class="stsel" data-id="${r.id}" onchange="stSelChanged()"></td>
         <td><label class="st-yes" title="${ok?'Tick when this line is ready':'Needs a date, an amount above 0 and an allocation'}"><input type="checkbox" ${r.ready?'checked':''} ${ok?'':'disabled'} onchange="stSetReady('${r.id}',this.checked)">Yes</label></td>
@@ -3053,7 +3073,7 @@ function stMoveTicked(){
       if(state.lists.persons.length<LIST_LIMITS.persons) state.lists.persons.push(r.person); else skippedLists++; }
     const rec={ id:uid(), date:r.date, description:r.description, type:r.type, allocation:r.allocation,
       amount:Math.abs(Number(r.amount))||0, account:r.account, person:r.person, notes:r.notes||'' };
-    if(r.type==='Expense'&&stDir(r)==='in') rec.refund=true;
+    if((r.type==='Expense'||r.type==='Deduction')&&stDir(r)==='in') rec.refund=true;
     if(r.type==='Transfer'){
       if(stDir(r)==='in'){ rec.account=r.other||''; rec.toAccount=r.account; }
       else if(r.other) rec.toAccount=r.other;
@@ -3259,7 +3279,7 @@ function renderTax(){
   const person=val('taxPerson');
   const rows=yearTxns().filter(t=>person==='All'||t.person===person);
   const gross=sumType(rows,'Income');
-  const tax=sum(rows.filter(t=>t.type==='Deduction'&&/tax|paye/i.test(t.allocation)).map(t=>t.amount));
+  const tax=sum(rows.filter(t=>t.type==='Deduction'&&/tax|paye/i.test(t.allocation)).map(netAmt));   // SARS refunds reduce it
   const cm=claimMap();
   // Recorded total (abs) per claimable key from matching transactions
   const rec={};
