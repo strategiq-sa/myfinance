@@ -513,6 +513,27 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
   .kpi-flow{grid-template-columns:1fr}
   .brand .sub{display:none}
 }
+/* ---- type-to-search dropdowns (allocation filters) ---- */
+.ss-wrap{position:relative; display:block; min-width:130px}
+.ss-wrap > select.ss-native{position:absolute; inset:0; opacity:0; pointer-events:none; width:100%; height:100%}
+.ss-input{width:100%; cursor:text}
+.ss-wrap::after{content:'▾'; position:absolute; right:10px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none; font-size:12px}
+.ss-input{padding-right:26px}
+.ss-list{position:fixed; z-index:150; display:none; max-height:280px; overflow-y:auto; background:var(--panel); border:1px solid var(--line); border-radius:10px; box-shadow:0 14px 40px rgba(8,18,38,.28); padding:4px}
+.ss-opt{padding:7px 10px; border-radius:7px; cursor:pointer; color:var(--text); font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.ss-opt.hi{background:var(--panel-2)}
+.ss-opt.cur{font-weight:700}
+.ss-opt b{color:var(--brand)}
+.ss-empty{padding:8px 10px; color:var(--muted); font-size:13px}
+/* ---- Setup list filters + duplicate warning ---- */
+.setup-filter{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:6px 0 10px}
+.setup-filter .field{flex:1; min-width:180px}
+.setup-filter .tiny{white-space:nowrap}
+.chip.flash{outline:2px solid var(--deduction); animation:chipFlash 1.2s ease 2}
+@keyframes chipFlash{50%{outline-color:transparent}}
+.dup-hint{font-size:12.5px; margin-top:6px; min-height:0}
+.dup-hint.bad{color:var(--deduction); font-weight:700}
+.dup-hint.warn{color:var(--muted)}
 </style>
 </head>
 <body>
@@ -836,8 +857,10 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
       </div>
       <div class="card pad" style="margin-top:16px">
         <h3 style="margin-bottom:4px">Expense allocations</h3>
+        <div class="setup-filter"><input class="field" id="fltExpense" placeholder="🔍 Filter expense allocations… e.g. med" oninput="renderExpenseChips()"><button class="btn ghost sm" onclick="document.getElementById('fltExpense').value='';renderExpenseChips()">Clear</button><span class="tiny" id="fltExpenseCount"></span></div>
         <div class="chips" id="listExpense"></div>
-        <div class="add-inline"><input class="field" id="addExpense" placeholder="Add expense allocation…" style="flex:1"><button class="btn primary sm" onclick="addAlloc('Expense')">Add</button></div>
+        <div class="add-inline"><input class="field" id="addExpense" placeholder="Add expense allocation…" style="flex:1" oninput="allocDupHint('Expense')" onkeydown="if(event.key==='Enter')addAlloc('Expense')"><button class="btn primary sm" onclick="addAlloc('Expense')">Add</button></div>
+        <div class="dup-hint" id="dupExpense"></div>
       </div>
       <div class="grid g2" style="margin-top:16px">
         <div class="card pad">
@@ -856,6 +879,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
       <div class="card pad" style="margin-top:16px">
         <h3 style="margin-bottom:4px">Tax-claimable allocations</h3>
         <p class="tiny" style="margin-bottom:14px">Tick the allocations you can claim against tax. Ticked items and their yearly totals appear on the <b>Tax</b> page.</p>
+        <div class="setup-filter"><input class="field" id="fltClaim" placeholder="🔍 Filter allocations… e.g. med" oninput="renderClaimable()"><select class="field" id="fltClaimShow" style="flex:0 0 auto" onchange="renderClaimable()"><option value="all">Show all</option><option value="on">Ticked only (claimed)</option><option value="off">Not ticked</option></select><button class="btn ghost sm" onclick="document.getElementById('fltClaim').value='';document.getElementById('fltClaimShow').value='all';renderClaimable()">Clear</button><span class="tiny" id="fltClaimCount"></span></div>
         <div id="claimableBox"></div>
       </div>
       <div class="grid g2" style="margin-top:16px">
@@ -3001,7 +3025,8 @@ function stEdit(id, field, v){
 function stAllocPicked(id, sel){
   const r=stFind(id); if(!r) return;
   let v=sel.value;
-  if(v==='__new'){ v=(prompt(`New ${r.type} allocation name:`)||'').trim(); if(!v){ renderStaging(); return; } }
+  if(v==='__new'){ v=(prompt(`New ${r.type} allocation name:`)||'').trim().replace(/\s+/g,' '); if(!v){ renderStaging(); return; }
+    if(state.lists.allocations[r.type]){ const {exact}=allocDupCheck(r.type,v); if(exact){ toast(`"${exact}" already exists, using it`); v=exact; } } }
   r.suggested=false; stEdit(id,'allocation',v);
 }
 function stSetReady(id, on){
@@ -3328,7 +3353,7 @@ function renderTax(){
 function renderSetup(){
   chipBox('listIncome', state.lists.allocations.Income, i=>removeAlloc('Income',i));
   chipBox('listDeduction', state.lists.allocations.Deduction, i=>removeAlloc('Deduction',i));
-  chipBox('listExpense', state.lists.allocations.Expense, i=>removeAlloc('Expense',i));
+  renderExpenseChips();
   chipBox('listDebt', state.lists.allocations['Debt Repayment'], i=>removeAlloc('Debt Repayment',i));
   chipBox('listTransfer', state.lists.allocations.Transfer, i=>removeAlloc('Transfer',i));
   chipBox('listAccounts', state.lists.accounts, i=>removeSimple('accounts',i));
@@ -3437,10 +3462,26 @@ function saveCustomCur(){
   if(!symbol){ toast('Enter a currency symbol',true); return; }
   state.settings.currency={code,symbol}; save(); render(); toast('Currency updated');
 }
-function chipBox(id, items, onRemove){
+function chipBox(id, items, onRemove, q){
   const el=document.getElementById(id);
-  el.innerHTML=items.map((it,i)=>`<span class="chip">${esc(it)}<button title="Remove" onclick="(${'window.__rm'})('${id}',${i})">×</button></span>`).join('') || '<span class="tiny">None yet.</span>';
+  const shown=items.map((it,i)=>({it,i})).filter(x=>textMatches(x.it,q));
+  el.innerHTML=shown.map(({it,i})=>`<span class="chip" data-name="${esc(it)}">${esc(it)}<button title="Remove" onclick="(${'window.__rm'})('${id}',${i})">×</button></span>`).join('')
+    || (items.length&&q ? '<span class="tiny">No allocation matches your filter.</span>' : '<span class="tiny">None yet.</span>');
   el._remove=onRemove;
+  return shown.length;
+}
+/* "med" matches Medical aid / Medical expenses / Medical Other; several words must all appear */
+function textMatches(text,q){
+  const words=String(q||'').toLowerCase().trim().split(/\s+/).filter(Boolean);
+  const t=String(text||'').toLowerCase();
+  return words.every(w=>t.includes(w));
+}
+function renderExpenseChips(){
+  const f=document.getElementById('fltExpense'), q=f?f.value:'';
+  const items=state.lists.allocations.Expense||[];
+  const n=chipBox('listExpense', items, i=>removeAlloc('Expense',i), q);
+  const c=document.getElementById('fltExpenseCount');
+  if(c) c.textContent = q.trim() ? `Showing ${n} of ${items.length}` : `${items.length} allocations`;
 }
 window.__rm=(id,i)=>{ const el=document.getElementById(id); if(el&&el._remove) el._remove(i); };
 
@@ -3464,8 +3505,14 @@ function setClaimPct(type,alloc,val){
 function renderClaimable(){
   const box=document.getElementById('claimableBox'); if(!box) return;
   const groups=['Deduction','Expense'];
+  const q=(document.getElementById('fltClaim')||{}).value||'';
+  const show=(document.getElementById('fltClaimShow')||{}).value||'all';
+  let shownTotal=0, allTotal=0;
   box.innerHTML=groups.map(type=>{
-    const items=state.lists.allocations[type]||[];
+    const all=state.lists.allocations[type]||[];
+    allTotal+=all.length;
+    const items=all.filter(a=>textMatches(a,q) && (show==='all' || (show==='on')===isClaimable(type,a)));
+    shownTotal+=items.length;
     if(!items.length) return '';
     return `<div class="claim-group"><div class="claim-glabel">${type}s</div><div class="claim-grid">`+
       items.map(a=>{
@@ -3474,7 +3521,9 @@ function renderClaimable(){
         return `<label class="claim-item${on?' on':''}"><input type="checkbox" ${on?'checked':''} data-type="${esc(type)}" data-alloc="${esc(a)}"><span title="${esc(a)}">${esc(a)}</span>`+
           `<span class="claim-pct-wrap"${on?'':' style="visibility:hidden"'}><input type="number" class="claim-pct" min="0" max="100" step="1" value="${pct}" data-ptype="${esc(type)}" data-palloc="${esc(a)}"><span class="claim-pct-sign">%</span></span></label>`;
       }).join('')+`</div></div>`;
-  }).join('');
+  }).join('') || '<p class="tiny">No allocation matches your filter.</p>';
+  const cc=document.getElementById('fltClaimCount');
+  if(cc) cc.textContent = (q.trim()||show!=='all') ? `Showing ${shownTotal} of ${allTotal}` : '';
   box.querySelectorAll('input[type=checkbox]').forEach(cb=>{
     cb.onchange=()=>toggleClaimable(cb.dataset.type, cb.dataset.alloc, cb.checked);
   });
@@ -3484,10 +3533,42 @@ function renderClaimable(){
     inp.onchange=()=>{ setClaimPct(inp.dataset.ptype, inp.dataset.palloc, inp.value); renderClaimable(); };
   });
 }
+/* ---------- duplicate check for new allocations ----------
+   "Medical Aid", "medical  aid", "Medical-aid" all count as the same name.
+   Near matches ("Medical expense" vs "Medical expenses", "Fuel" vs "Fuel & Oil") ask first. */
+function allocNorm(s){
+  return String(s||'').toLowerCase().replace(/&/g,' and ').replace(/[^a-z0-9]+/g,' ').trim()
+    .split(' ').filter(Boolean).map(w=>w.length>3?w.replace(/s$/,''):w).join(' ');
+}
+function allocDupCheck(type,v){
+  const n=allocNorm(v), list=state.lists.allocations[type]||[];
+  if(!n) return {exact:null, similar:[]};
+  const exact=list.find(a=>allocNorm(a)===n)||null;
+  const similar=exact?[]:list.filter(a=>{ const m=allocNorm(a); return m && Math.min(m.length,n.length)>=4 && (m.includes(n)||n.includes(m)); });
+  return {exact, similar};
+}
+function allocDupHint(type){
+  const inp=document.getElementById('add'+type.replace(' Repayment','')), box=document.getElementById('dup'+type.replace(' Repayment',''));
+  if(!inp||!box) return;
+  const {exact,similar}=allocDupCheck(type, inp.value);
+  box.className='dup-hint'+(exact?' bad':similar.length?' warn':'');
+  box.textContent = exact ? `⚠ "${exact}" already exists. It can't be added twice.`
+    : similar.length ? `Similar allocations already exist: ${similar.join(', ')}` : '';
+}
+function flashChip(type,name){
+  const id={Income:'listIncome',Deduction:'listDeduction',Expense:'listExpense','Debt Repayment':'listDebt',Transfer:'listTransfer'}[type];
+  if(type==='Expense'){ const f=document.getElementById('fltExpense'); if(f){ f.value=''; renderExpenseChips(); } }
+  const el=document.getElementById(id); if(!el) return;
+  const chip=[...el.querySelectorAll('.chip')].find(c=>c.dataset.name===name);
+  if(chip){ chip.classList.add('flash'); chip.scrollIntoView({block:'nearest',behavior:'smooth'}); setTimeout(()=>chip.classList.remove('flash'),2600); }
+}
 function addAlloc(type){
-  const inp=document.getElementById('add'+type.replace(' Repayment','')); const v=inp.value.trim(); if(!v) return;
-  if(!state.lists.allocations[type].includes(v)) state.lists.allocations[type].push(v);
-  inp.value=''; save(); renderSetup(); refreshDropdowns(); toast('Added');
+  const inp=document.getElementById('add'+type.replace(' Repayment','')); const v=inp.value.trim().replace(/\s+/g,' '); if(!v) return;
+  const {exact,similar}=allocDupCheck(type,v);
+  if(exact){ toast(`"${exact}" already exists in ${type}`,true); flashChip(type,exact); return; }
+  if(similar.length && !confirm(`These ${type} allocations look similar to "${v}":\n\n• ${similar.join('\n• ')}\n\nAdd "${v}" anyway?`)) return;
+  state.lists.allocations[type].push(v);
+  inp.value=''; allocDupHint(type); save(); renderSetup(); refreshDropdowns(); toast('Added');
 }
 function removeAlloc(type,i){
   const name=state.lists.allocations[type][i];
@@ -4018,12 +4099,74 @@ function render(){
 document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('show'); }));
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.querySelectorAll('.modal-bg.show').forEach(m=>m.classList.remove('show')); });
 
+/* ============================================================
+   TYPE-TO-SEARCH DROPDOWNS
+   Turns a normal <select> into a box you can type in: "med" shows
+   Medical aid, Medical expenses, Medical Other. The real <select> stays
+   underneath, so every existing onchange / .value keeps working.
+   ============================================================ */
+const SEARCHABLE_SELECTS=['fAlloc','txAlloc','stAlloc','tAlloc','bulkAlloc'];
+function makeSearchable(sel){
+  if(!sel||sel._ss) return; sel._ss=true;
+  const wrap=document.createElement('div'); wrap.className='ss-wrap';
+  sel.parentNode.insertBefore(wrap,sel); wrap.appendChild(sel);
+  const inp=document.createElement('input'); inp.type='text'; inp.autocomplete='off'; inp.spellcheck=false;
+  inp.className=sel.className+' ss-input'; inp.placeholder='Type to search…';
+  if(sel.getAttribute('aria-label')) inp.setAttribute('aria-label',sel.getAttribute('aria-label'));
+  sel.classList.add('ss-native'); sel.tabIndex=-1;
+  const list=document.createElement('div'); list.className='ss-list'; document.body.appendChild(list);
+  wrap.appendChild(inp);
+  let shown=[], hi=-1, open=false;
+  const label=()=>{ const o=sel.options[sel.selectedIndex]; return o?o.text:''; };
+  const sync=()=>{ if(!open) inp.value=label(); inp.disabled=sel.disabled; };
+  const place=()=>{ const r=inp.getBoundingClientRect(); list.style.left=r.left+'px'; list.style.top=(r.bottom+4)+'px'; list.style.minWidth=r.width+'px';
+    const room=window.innerHeight-r.bottom-12; list.style.maxHeight=Math.max(160,Math.min(280,room))+'px'; };
+  const mark=(t,words)=>{ const w=words[0]; if(!w) return esc(t); const i=t.toLowerCase().indexOf(w); if(i<0) return esc(t);
+    return esc(t.slice(0,i))+'<b>'+esc(t.slice(i,i+w.length))+'</b>'+esc(t.slice(i+w.length)); };
+  const draw=q=>{
+    const words=String(q||'').toLowerCase().trim().split(/\s+/).filter(Boolean);
+    shown=[...sel.options].filter(o=>!o.disabled && words.every(w=>o.text.toLowerCase().includes(w)));
+    if(hi>=shown.length) hi=shown.length-1; if(hi<0&&shown.length) hi=0;
+    list.innerHTML=shown.length ? shown.map((o,i)=>`<div class="ss-opt${i===hi?' hi':''}${o.value===sel.value?' cur':''}" data-i="${i}">${mark(o.text,words)}</div>`).join('')
+      : '<div class="ss-empty">No match</div>';
+    place(); list.style.display='block'; open=true;
+    const h=list.querySelector('.ss-opt.hi'); if(h) h.scrollIntoView({block:'nearest'});
+  };
+  const close=()=>{ open=false; list.style.display='none'; inp.value=label(); };
+  const pick=o=>{ if(!o) return; const changed=sel.value!==o.value; sel.value=o.value; close(); inp.blur();
+    if(changed) sel.dispatchEvent(new Event('change',{bubbles:true})); };
+  inp.addEventListener('focus',()=>{ hi=Math.max(0,shownIndexOfCurrent()); draw(''); setTimeout(()=>inp.select(),0); });
+  function shownIndexOfCurrent(){ return [...sel.options].findIndex(o=>o.value===sel.value); }
+  inp.addEventListener('input',()=>{ hi=0; draw(inp.value); });
+  inp.addEventListener('keydown',e=>{
+    if(e.key==='ArrowDown'){ e.preventDefault(); if(!open){ draw(''); return; } hi=Math.min(shown.length-1,hi+1); draw(inp.value===label()?'':inp.value); }
+    else if(e.key==='ArrowUp'){ e.preventDefault(); hi=Math.max(0,hi-1); draw(inp.value===label()?'':inp.value); }
+    else if(e.key==='Enter'){ e.preventDefault(); if(open) pick(shown[hi]); }
+    else if(e.key==='Escape'){ if(open){ e.stopPropagation(); close(); inp.blur(); } }
+    else if(e.key==='Tab'){ close(); }
+  });
+  list.addEventListener('mousedown',e=>{ e.preventDefault(); const d=e.target.closest('.ss-opt'); if(d) pick(shown[+d.dataset.i]); });
+  inp.addEventListener('blur',()=>setTimeout(()=>{ if(document.activeElement!==inp) close(); },100));
+  window.addEventListener('scroll',e=>{ if(open && !list.contains(e.target)) place(); },true);
+  window.addEventListener('resize',()=>{ if(open) place(); });
+  // keep the text box in step when the app refills or sets the dropdown
+  new MutationObserver(sync).observe(sel,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled']});
+  sel.addEventListener('change',sync);
+  const vd=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value');
+  Object.defineProperty(sel,'value',{configurable:true, get(){ return vd.get.call(sel); }, set(v){ vd.set.call(sel,v); sync(); }});
+  const sd=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'selectedIndex');
+  Object.defineProperty(sel,'selectedIndex',{configurable:true, get(){ return sd.get.call(sel); }, set(v){ sd.set.call(sel,v); sync(); }});
+  sync();
+}
+function initSearchableSelects(){ SEARCHABLE_SELECTS.forEach(id=>makeSearchable(document.getElementById(id))); }
+
 /* boot */
 if(LOCAL_TEST){ document.body.insertAdjacentHTML('afterbegin','<div class="test-strip">TEST COPY: saved on this computer only, your live data is not touched</div>'); }
 loadSession();
 if(LOCAL_TEST) saveSession(null);
 load();
 refreshDropdowns();
+initSearchableSelects();
 (async()=>{
   if(configured() && loggedIn()){ render(); await afterLogin(true); }
   else if(configured() && !loggedIn()){ setCloud('local'); render(); showAuthGate(); }
