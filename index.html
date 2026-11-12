@@ -4190,6 +4190,19 @@ function openInviteSignup(){
 }
 /* boot */
 if(LOCAL_TEST){ document.body.insertAdjacentHTML('afterbegin','<div class="test-strip">TEST COPY: saved on this computer only, your live data is not touched</div>'); }
+/* email links (signup confirmation): Supabase puts the login after the # — save it, then clean the address bar */
+(function readAuthHash(){
+  if(!location.hash || !/access_token=|error=/.test(location.hash)) return;
+  const h=new URLSearchParams(location.hash.slice(1));
+  history.replaceState(null,'',location.pathname+location.search);
+  const tok=h.get('access_token');
+  if(!tok || LOCAL_TEST) return;
+  try{
+    const p=JSON.parse(atob(tok.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+    saveSession(mkSession({access_token:tok, refresh_token:h.get('refresh_token'),
+      expires_in:Number(h.get('expires_in'))||3600, user:{id:p.sub, email:p.email||''}}));
+  }catch(e){}
+})();
 loadSession();
 if(LOCAL_TEST) saveSession(null);
 load();
