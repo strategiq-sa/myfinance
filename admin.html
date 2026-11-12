@@ -521,6 +521,7 @@ async function loadLogins(){
       <td>${l.user_id?'Yes':'<span class="tiny">Not yet</span>'}</td>
       <td class="num">${fmtDT(l.last_login_at)}</td>
       <td style="white-space:nowrap">
+        ${(!l.user_id && l.role==='Member' && l.status==='Active')?`<button class="btn ghost sm" onclick="adminInvite('${l.id}','${esc(l.email)}')">Send invite</button>`:''}
         <button class="btn ghost sm" onclick="toggleLogin('${l.id}','${l.status==='Active'?'Disabled':'Active'}')">${l.status==='Active'?'Disable':'Enable'}</button>
         <button class="btn danger sm" onclick="removeLogin('${l.id}','${esc(l.email)}')">Remove</button></td>
     </tr>`).join('') : `<tr><td colspan="7"><div class="empty">No logins yet.</div></td></tr>`;
@@ -534,6 +535,17 @@ async function addLogin(){
     await api('client_logins',{method:'POST',headers:REP,body:JSON.stringify({client_id:cur.id,email,full_name:name||null,role:$('l_role').value})});
     $('l_email').value=''; $('l_name').value=''; await loadLogins(); loadAll(); toast('Login added');
   }catch(e){ msg('lMsg', /duplicate|unique/i.test(e.message)?'That email is already a login on a client.':e.message); }
+}
+async function adminInvite(id,email){
+  msg('lMsg','Sending invite…',true);
+  const go=()=>fetch(SUPA_URL+'/functions/v1/send-invite',{method:'POST',headers:{apikey:SUPA_KEY,Authorization:'Bearer '+(session&&session.access_token),'Content-Type':'application/json'},body:JSON.stringify({login_id:id})});
+  try{
+    let r=await go();
+    if(r.status===401 && session && session.refresh_token){ saveSess(await authCall('token?grant_type=refresh_token',{refresh_token:session.refresh_token})); r=await go(); }
+    const d=await r.json().catch(()=>({}));
+    if(r.ok&&d.sent){ msg('lMsg','Invite sent to '+email+' ✓',true); toast('Invite sent'); }
+    else msg('lMsg',d.error||'Invite could not be sent.');
+  }catch(e){ msg('lMsg','Cannot reach the server.'); }
 }
 async function toggleLogin(id,st){
   try{ await api('client_logins?id=eq.'+id,{method:'PATCH',body:JSON.stringify({status:st})}); await loadLogins(); loadAll(); }

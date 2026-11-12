@@ -1231,7 +1231,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
           </div>
           <div style="display:flex; gap:10px; align-items:center; margin-top:8px; flex-wrap:wrap">
             <button class="btn primary sm" onclick="addUser()">＋ Add user</button>
-            <span class="tiny">They then go to EZ-Fin, tap <b>Start your 30-day free trial</b> and sign up with this email — they join your account and share your data.</span>
+            <span class="tiny">We email them an invite. They click the button in the email and sign up — they join your account and share your data.</span>
           </div>
         </div>
         <div id="usrMsg" class="gate-msg"></div>
@@ -3910,6 +3910,7 @@ async function loadUsers(){
         btns = r.status==='Active'
           ? `<button class="btn ghost sm" onclick="setUserStatus('${r.id}','Disabled')">Disable</button>`
           : `<button class="btn ghost sm" onclick="setUserStatus('${r.id}','Active')">Enable</button>`;
+        if(!r.user_id && r.status==='Active') btns+=` <button class="btn ghost sm" onclick="resendInvite('${r.id}','${esc(r.email).replace(/'/g,'&#39;')}')">Resend invite</button>`;
         if(!r.user_id) btns+=` <button class="btn danger sm" onclick="removeUser('${r.id}')">Remove</button>`;
       }
       return `<div class="usr-row"><div class="who"><b>${esc(r.full_name||r.email)}</b><span class="tiny">${esc(r.email)}</span></div>${tag}${btns}</div>`;
@@ -3922,10 +3923,28 @@ async function loadUsers(){
 async function addUser(){
   const email=document.getElementById('usrEmail').value.trim(), name=document.getElementById('usrName').value.trim();
   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ usrMsg('Please enter a valid email address.'); return; }
-  try{ await rpc('app_add_login',{p_email:email,p_name:name||null});
-    document.getElementById('usrEmail').value=''; document.getElementById('usrName').value='';
-    await loadUsers(); usrMsg(`Added ✓ Ask ${name||email} to sign up on EZ-Fin with ${email}.`,true);
-  }catch(e){ usrMsg(e.message); }
+  let row;
+  try{ row=await rpc('app_add_login',{p_email:email,p_name:name||null}); }
+  catch(e){ usrMsg(e.message); return; }
+  document.getElementById('usrEmail').value=''; document.getElementById('usrName').value='';
+  await loadUsers();
+  usrMsg('Added ✓ Sending the invite email…',true);
+  const r=await sendInvite(row&&row.id);
+  usrMsg(r.ok ? `Added ✓ An invite email has been sent to ${email}. They click the button in the email to sign up and join your account.`
+              : `Added ✓ but the invite email could not be sent (${r.error}). Tap “Resend invite” to try again.`, r.ok);
+}
+async function sendInvite(id){
+  if(!id) return {ok:false,error:'missing user'};
+  try{
+    const res=await withAuth(()=>fetch(cfgUrl()+'/functions/v1/send-invite',{method:'POST',headers:restHeaders(),body:JSON.stringify({login_id:id})}));
+    const d=await res.json().catch(()=>({}));
+    return res.ok&&d.sent ? {ok:true} : {ok:false,error:d.error||'please try again'};
+  }catch(e){ return {ok:false,error:'cannot reach the server'}; }
+}
+async function resendInvite(id,email){
+  usrMsg('Sending the invite email…',true);
+  const r=await sendInvite(id);
+  usrMsg(r.ok?`Invite sent again to ${email} ✓`:r.error, r.ok);
 }
 async function setUserStatus(id,st){
   try{ await rpc('app_set_login_status',{p_id:id,p_status:st}); await loadUsers(); usrMsg(st==='Active'?'User enabled ✓':'User disabled ✓',true); }
@@ -4160,6 +4179,16 @@ function makeSearchable(sel){
 }
 function initSearchableSelects(){ SEARCHABLE_SELECTS.forEach(id=>makeSearchable(document.getElementById(id))); }
 
+/* invite link: ?invite=email → open the sign-up form with the invited email filled in */
+function openInviteSignup(){
+  const q=new URLSearchParams(location.search), inv=(q.get('invite')||'').trim();
+  if(!inv) return;
+  q.delete('invite'); history.replaceState(null,'',location.pathname+(q.toString()?'?'+q:''));
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(inv)) return;
+  const se=document.getElementById('suEmail'); if(se) se.value=inv;
+  gateMode('signup');
+  suMsg('You have been invited to join an EZ-Fin account. Fill in your details below — keep the email exactly as it is.',true);
+}
 /* boot */
 if(LOCAL_TEST){ document.body.insertAdjacentHTML('afterbegin','<div class="test-strip">TEST COPY: saved on this computer only, your live data is not touched</div>'); }
 loadSession();
@@ -4169,7 +4198,7 @@ refreshDropdowns();
 initSearchableSelects();
 (async()=>{
   if(configured() && loggedIn()){ render(); await afterLogin(true); }
-  else if(configured() && !loggedIn()){ setCloud('local'); render(); showAuthGate(); }
+  else if(configured() && !loggedIn()){ setCloud('local'); render(); showAuthGate(); openInviteSignup(); }
   else { setCloud('local'); render(); }
   updateAuthUI();
 })();
