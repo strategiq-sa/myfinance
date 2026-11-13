@@ -23,7 +23,7 @@ table{width:100%; border-collapse:collapse; font-size:14px; margin:8px 0}
 th,td{border:1px solid var(--line); padding:8px 10px; text-align:left; vertical-align:top}
 th{background:var(--soft)}
 a{color:var(--brand); font-weight:600}
-ul{padding-left:20px} li{margin:4px 0}
+ul,ol{padding-left:20px} li{margin:4px 0} li p{margin:0}
 .back{display:inline-block; margin-bottom:16px}
 @media (max-width:560px){ .card{padding:22px 16px} table,thead,tbody,tr,th,td{font-size:13px} }
 </style>
@@ -32,101 +32,274 @@ ul{padding-left:20px} li{margin:4px 0}
 <div class="wrap">
 <a class="back" href="./">← Back to EZ-Fin</a>
 <div class="card">
-<h1>Privacy Policy</h1>
-<div class="meta">EZ-Fin · Effective date: 26 October 2026 · Version 1.0</div>
-
-<div class="box">In short: we collect only what we need to run your EZ-Fin account, we never sell your information, your financial data is private to your account, and you can ask us to see, correct or delete your information at any time.</div>
-
-<h2>1. Who we are</h2>
-<p>EZ-Fin ("we", "us", "our") is a household finance web app operated by <b>[Registered company name] (Pty) Ltd</b>, registration number <b>[____/______/07]</b>, the "responsible party" under the Protection of Personal Information Act 4 of 2013 ("POPIA").</p>
-<table>
-<tr><th>Information Officer</th><td>Clint Proctor</td></tr>
-<tr><th>Email</th><td><a href="mailto:admin@ez-fin.co.za">admin@ez-fin.co.za</a></td></tr>
-<tr><th>Physical address</th><td>33 Beach Road, Westbrook, Tongaat, 4439, KwaZulu-Natal, South Africa</td></tr>
-</table>
-
-<h2>2. What information we collect</h2>
-<table>
-<tr><th>Type</th><th>Examples</th><th>Where it comes from</th></tr>
-<tr><td>Account details</td><td>First name, last name, email, mobile number, province/region, country, how you heard about us</td><td>You, when you sign up</td></tr>
-<tr><td>Login details</td><td>Email and an encrypted password (we cannot see your password), login dates and device type</td><td>You and your device</td></tr>
-<tr><td>Your finance data</td><td>Transactions, budgets, categories, tax information and imported bank statements you choose to add</td><td>You</td></tr>
-<tr><td>Subscription and payment records</td><td>Plan, payment dates, amounts, invoice numbers and payment references</td><td>Our payment provider</td></tr>
-<tr><td>Consent records</td><td>When you accepted this policy and your marketing email choice</td><td>You</td></tr>
-</table>
-<p><b>We never receive or store your card number.</b> Card payments are processed directly by our payment provider, iKhokha, on its own secure (PCI-DSS compliant) payment page. When you import a bank statement, full bank account numbers are masked before they are stored.</p>
-
-<h2>3. Why we use it</h2>
+<h1>EZ-Fin Privacy Policy</h1>
+<p><strong>Effective date:</strong> 1 November 2026</p>
+<p><strong>Responsible party:</strong> Clint Proctor, a sole proprietor trading as
+EZ-Fin ("EZ-Fin", "we", "us")</p>
+<p><strong>Information Officer:</strong> Clint Proctor (owner)</p>
+<p>Address: 33 Beach Road, Westbrook, Tongaat, 4439</p>
+<p><strong>Contact:</strong> <a href="mailto:admin@ez-fin.co.za">admin@ez-fin.co.za</a></p>
+<p>EZ-Fin is a household finance manager. You trust us with personal and
+financial information, and we take that seriously. This policy explains
+what we collect, why, who we share it with, and your rights under the
+<strong>Protection of Personal Information Act 4 of 2013 (POPIA)</strong>.</p>
+<h2>1. Who this policy applies to</h2>
+<p>It applies to everyone who visits ez-fin.co.za, signs up for a trial,
+pays for a plan, or is invited as an extra user on an account.</p>
+<h2>2. What we collect</h2>
+<h3>2.1 Account details (you give us)</h3>
 <ul>
-<li>To create and run your account, including your free trial and up to 3 linked users.</li>
-<li>To store and sync your finance data so you can use EZ-Fin on any device.</li>
-<li>To process payments and keep billing and tax records.</li>
-<li>To send service emails: trial and renewal reminders, payment confirmations, password resets and important changes. These are part of the service and are not marketing.</li>
-<li>To send news and offers, <b>only if you ticked the marketing box</b>. You can unsubscribe at any time.</li>
-<li>To keep EZ-Fin secure, prevent fraud and fix problems.</li>
-</ul>
-<p>We process your information with your consent, to perform our contract with you, to meet legal obligations (such as tax record-keeping), and for our legitimate interest in running a secure service (POPIA section 11).</p>
-
-<h2>4. Who can see your information</h2>
-<ul>
-<li><b>Your finance data</b> is visible only to you and the other users on your account (maximum 3). By design, EZ-Fin administrators cannot open it.</li>
-<li><b>Our administrators</b> can see your account and subscription details to give support and manage billing.</li>
-<li><b>Service providers ("operators")</b> who process information for us under written agreements:
-  <ul>
-    <li>Supabase — secure database and login hosting.</li>
-    <li>iKhokha — card payment processing (South Africa).</li>
-    <li>Our email delivery provider — for sending service and reminder emails.</li>
-    <li>GitHub Pages — hosting of the website itself (it does not receive your account data).</li>
-  </ul>
+<li>
+<p><strong>Required:</strong> first name, last name, email address, password, and your
+  POPIA consent (with the date and time you gave it).</p>
 </li>
-<li>Authorities, only where the law requires it.</li>
+<li>
+<p><strong>Optional:</strong> mobile number, country, province or region, how you
+  heard about us, and whether you want marketing emails.</p>
+</li>
+<li>
+<p>Your password is stored in encrypted (hashed) form. We cannot see it.</p>
+</li>
 </ul>
-<p><b>We do not sell, rent or trade your personal information.</b></p>
-
-<h2>5. Information stored outside South Africa</h2>
-<p>Your account and finance data is stored by Supabase in data centres in the <b>United Kingdom</b>, and some service providers may process information in the European Union or the United States. Under POPIA section 72, we only transfer information to providers bound by laws, binding agreements or corporate rules giving protection substantially similar to POPIA (such as the UK and EU General Data Protection Regulation). By signing up, you consent to this transfer.</p>
-
-<h2>6. How we protect it</h2>
+<h3>2.2 Financial information (you enter in the app)</h3>
+<p>Transactions, income, expenses, budgets, bank account names and
+balances, savings, tax information and any notes you add. <strong>You decide
+what to enter.</strong> We do not connect to your bank and never ask for
+internet banking login details.</p>
+<h3>2.3 Cash slip photos</h3>
+<p>If you use the cash slip feature, the photo is read <strong>on your own
+device</strong> to fill in the shop, date and amount. <strong>The photo is never
+uploaded or saved.</strong> Only the details you choose to save are kept.</p>
+<h3>2.4 Payment information</h3>
+<p>Payments are handled by our approved payment partner. <strong>We never see or
+store your card number.</strong> We keep the plan, amount, date, payment
+reference, invoice number and whether the payment succeeded.</p>
+<h3>2.5 Technical information</h3>
+<p>When you use the app or website we may collect your IP address, browser
+and device type, login times and basic error logs. These help us keep
+the service secure and working.</p>
+<h3>2.6 Emails we send you</h3>
+<p>We keep a record of the service emails we send (for example trial and
+renewal reminders and invites), including the date and whether they were
+delivered.</p>
+<h2>3. Why we use your information</h2>
+<table>
+<thead>
+<tr>
+<th><strong>Purpose</strong></th>
+<th><strong>Lawful basis under POPIA</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Create and run your account, and keep your data in sync across your logins</td>
+<td>Needed to perform our agreement with you</td>
+</tr>
+<tr>
+<td>Take payments, issue invoices and send renewal reminders</td>
+<td>Agreement with you; legal duty (tax records)</td>
+</tr>
+<tr>
+<td>Keep the service secure and fix problems</td>
+<td>Our legitimate interest</td>
+</tr>
+<tr>
+<td>Answer support questions</td>
+<td>Agreement with you</td>
+</tr>
+<tr>
+<td>Send news, tips and offers</td>
+<td><strong>Only with your consent</strong> (opt-in). You can unsubscribe at any time</td>
+</tr>
+<tr>
+<td>Understand how people find us (referral source) and improve EZ-Fin, using combined, anonymous figures</td>
+<td>Our legitimate interest</td>
+</tr>
+</tbody>
+</table>
+<p>We do <strong>not</strong> sell your personal information. We do <strong>not</strong> use your
+financial data for advertising, and we do <strong>not</strong> make automated
+decisions about you that have legal effects.</p>
+<h2>4. Who can see your information</h2>
+<h3>4.1 Inside EZ-Fin</h3>
 <ul>
-<li>All connections are encrypted (HTTPS), and data is encrypted at rest by our hosting provider.</li>
-<li>Database rules ensure each account can only reach its own data.</li>
-<li>Passwords are stored as one-way encrypted hashes.</li>
-<li>Access for our staff is limited to what is needed for support and billing.</li>
+<li>
+<p><strong>Your financial data:</strong> only you and the users on your account. We
+  <strong>cannot read</strong> your financial data; the system is built this way on
+  purpose.</p>
+</li>
+<li>
+<p><strong>Account and payment details:</strong> the owner of EZ-Fin and anyone he
+  authorises to help, to manage accounts, payments and support.</p>
+</li>
 </ul>
-<p>If a security breach affects your personal information, we will notify you and the Information Regulator as required by POPIA section 22.</p>
-
+<h3>4.2 Shared accounts</h3>
+<p>An account can have up to 3 logins that <strong>share one set of data</strong>. The
+account Owner adds or removes extra users. Anyone the Owner adds can see
+and change the shared financial data. Only invite people you trust.</p>
+<h3>4.3 Service providers (operators)</h3>
+<p>We use trusted providers who process information only on our
+instructions and under contracts that require them to keep it secure,
+our current providers are:</p>
+<table>
+<thead>
+<tr>
+<th><strong>Provider</strong></th>
+<th><strong>What they do</strong></th>
+<th><strong>Where</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Supabase</td>
+<td>Secure database, logins and app back end</td>
+<td>United Kingdom (London)</td>
+</tr>
+<tr>
+<td>iKhokha</td>
+<td>Card payments</td>
+<td>South Africa</td>
+</tr>
+<tr>
+<td>Resend</td>
+<td>Sending service emails</td>
+<td>European Union (Ireland)</td>
+</tr>
+<tr>
+<td>Cyber Circuit</td>
+<td>Website and email hosting</td>
+<td>South Africa</td>
+</tr>
+<tr>
+<td>GitHub Pages</td>
+<td>Hosting the app's program files (no personal data stored there)</td>
+<td>United States</td>
+</tr>
+<tr>
+<td>jsDelivr</td>
+<td>Delivering the free text-reading tool used for cash slips (sees only your IP address)</td>
+<td>Global network</td>
+</tr>
+</tbody>
+</table>
+<h3>4.4 When the law requires it</h3>
+<p>We may share information if a court order, law or regulator requires it,
+or to protect someone's safety or prevent fraud.</p>
+<h2>5. Information sent outside South Africa</h2>
+<p>Some providers store or process information outside South Africa (see
+the table above). Under section 72 of POPIA, we only use providers in
+countries with data-protection laws similar to POPIA (such as the UK and
+EU) or who are bound by contracts giving the same level of protection.
+By agreeing to this policy, you consent to these transfers.</p>
+<h2>6. How we protect your information</h2>
+<ul>
+<li>
+<p>All information travels over encrypted connections (HTTPS).</p>
+</li>
+<li>
+<p>Passwords are hashed; payment and email keys are kept as secrets on
+  the server and never in the app.</p>
+</li>
+<li>
+<p>Database rules make sure each account can only reach its own data.</p>
+</li>
+<li>
+<p>Anyone who helps us run EZ-Fin only gets access to what they need for
+  their task.</p>
+</li>
+<li>
+<p>If a security breach puts your information at risk, we will tell you
+  and the Information Regulator as soon as reasonably possible, as POPIA
+  requires.</p>
+</li>
+</ul>
+<p>You help too: use a strong password, do not share your login, and log
+out on shared devices.</p>
 <h2>7. How long we keep it</h2>
-<ul>
-<li>Account and finance data: for as long as your account is open. If your account is cancelled or suspended, we keep your data for <b>12 months</b> so you can return, then permanently delete it. You can ask us to delete it sooner.</li>
-<li>Payment and invoice records: <b>5 years</b>, as required by South African tax law.</li>
-<li>Login and email logs: up to 12 months.</li>
-</ul>
-
+<table>
+<thead>
+<tr>
+<th><strong>Information</strong></th>
+<th><strong>How long</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Account and financial data</td>
+<td>While your account is active or in trial</td>
+</tr>
+<tr>
+<td>After cancellation or suspension</td>
+<td>Kept for <strong>90 days</strong> so you can return, then <strong>permanently deleted</strong></td>
+</tr>
+<tr>
+<td>Invoices and payment records</td>
+<td><strong>5 years</strong>, as tax law requires</td>
+</tr>
+<tr>
+<td>Email logs and technical logs</td>
+<td>Up to 12 months</td>
+</tr>
+<tr>
+<td>Marketing consent records</td>
+<td>Until you withdraw consent, plus 12 months as proof</td>
+</tr>
+</tbody>
+</table>
+<p>You can ask us to delete your data sooner (see section 8). Information
+in backups is overwritten within a short period after deletion.</p>
 <h2>8. Your rights</h2>
-<p>Under POPIA you may, free of charge:</p>
-<ul>
-<li>ask what personal information we hold about you and get a copy of it;</li>
-<li>ask us to correct or update it;</li>
-<li>ask us to delete it (subject to the legal record-keeping above);</li>
-<li>object to processing, or withdraw your consent, including for marketing emails;</li>
-<li>complain to the Information Regulator.</li>
-</ul>
-<p>To use any of these rights, email <a href="mailto:admin@ez-fin.co.za">admin@ez-fin.co.za</a>. We will reply within 30 days. We may ask you to confirm your identity first.</p>
-<div class="box"><b>Information Regulator (South Africa)</b><br>
-Website: <a href="https://inforegulator.org.za" target="_blank" rel="noopener">inforegulator.org.za</a><br>
-Complaints: <a href="mailto:POPIAComplaints@inforegulator.org.za">POPIAComplaints@inforegulator.org.za</a> · General: <a href="mailto:enquiries@inforegulator.org.za">enquiries@inforegulator.org.za</a></div>
-
-<h2>9. Cookies and device storage</h2>
-<p>EZ-Fin does not use advertising or tracking cookies. It saves your login session and a working copy of your data in your browser's local storage so the app is fast and can work briefly offline. Logging out removes your session from that device.</p>
-
-<h2>10. Children</h2>
-<p>EZ-Fin is meant for adults. You must be 18 or older to open an account. We do not knowingly collect information about children.</p>
-
-<h2>11. Changes to this policy</h2>
-<p>We may update this policy from time to time. If we make important changes, we will tell you by email or in the app before they take effect. The effective date at the top always shows the latest version.</p>
-
-<h2>12. Contact us</h2>
-<p>Questions about this policy or your information: <a href="mailto:admin@ez-fin.co.za">admin@ez-fin.co.za</a> · 33 Beach Road, Westbrook, Tongaat, 4439.</p>
+<p>Under POPIA you can:</p>
+<ol>
+<li>
+<p><strong>Ask what information we hold</strong> about you and get a copy.</p>
+</li>
+<li>
+<p><strong>Correct</strong> information that is wrong or out of date. You can update
+    most details yourself in the app under Account.</p>
+</li>
+<li>
+<p><strong>Ask us to delete</strong> your information (subject to what the law
+    requires us to keep).</p>
+</li>
+<li>
+<p><strong>Object</strong> to us using your information, or <strong>withdraw consent</strong>
+    (for example, to marketing emails).</p>
+</li>
+<li>
+<p><strong>Complain</strong> to the Information Regulator.</p>
+</li>
+</ol>
+<p>To use any of these rights, email <strong>admin@ez-fin.co.za</strong> from the email
+address on your account. We may ask you to confirm your identity. We
+will reply within <strong>30 days</strong>, and there is no charge for reasonable
+requests.</p>
+<h2>9. Marketing emails</h2>
+<p>We only send marketing emails if you ticked the opt-in box. Every
+marketing email has an unsubscribe link. Service emails (such as trial
+reminders, renewal reminders and invoices) are part of running your
+account and are not marketing.</p>
+<h2>10. Cookies and browser storage</h2>
+<p>The EZ-Fin app uses your browser's storage only to keep you logged in
+and remember your settings. The app does not use advertising cookies.
+Our marketing website may use analytics or advertising tools (for
+example from Google or Meta) to measure how our adverts perform; you can
+block these in your browser settings.</p>
+<h2>11. Children</h2>
+<p>EZ-Fin is for people aged <strong>18 and over</strong>. We do not knowingly collect
+information from children. If you believe a child has signed up, contact
+us and we will delete the account.</p>
+<h2>12. Changes to this policy</h2>
+<p>We may update this policy. If the changes are important, we will email
+you before they take effect. The current version will always be on our
+website with its effective date.</p>
+<h2>13. Contact us or complain</h2>
+<p><strong>Information Officer:</strong> Clint Proctor <strong>Email:</strong> <a href="mailto:admin@ez-fin.co.za">admin@ez-fin.co.za</a>
+<strong>Post:</strong> 33 Beach Road, Westbrook, Tongaat, 4439</p>
+<p>If you are not happy with how we have handled your information, you can
+complain to the <strong>Information Regulator (South Africa)</strong> at
+<a href="https://www.inforegulator.org.za" target="_blank" rel="noopener">www.inforegulator.org.za</a>.</p>
+<p class="meta" style="margin-top:28px;text-align:center"><a href="privacy.html">Privacy Policy</a> · <a href="refund.html">Refund &amp; Cancellation Policy</a> · <a href="mailto:admin@ez-fin.co.za">admin@ez-fin.co.za</a></p>
 </div>
 </div>
 </body>
