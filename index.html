@@ -350,6 +350,33 @@ tr.claim-zero .tag-type{opacity:.7}
 .sec-row td{background:var(--accent-soft); font-weight:800; text-transform:uppercase; letter-spacing:.05em; font-size:11.5px; color:var(--accent)}
 
 .tiny{font-size:12px; color:var(--muted)}
+/* budget tracking */
+.btabs{display:inline-flex; border:1px solid var(--line); border-radius:10px; overflow:hidden; margin-bottom:16px}
+.btabs button{background:var(--panel-2); border:none; padding:9px 16px; font-weight:700; font-size:13px; color:var(--muted); cursor:pointer; border-right:1px solid var(--line)}
+.btabs button:last-child{border-right:none}
+.btabs button.on{background:var(--brand-2); color:#fff}
+.bt-kpis{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px}
+.bt-kpi{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 16px}
+.bt-kpi .v{font-size:22px; font-weight:800; margin-top:4px}
+.bt-kpi.main{border-color:var(--brand-2)}
+.bt-kpi.main .v{font-size:26px}
+.bt-tbl{width:100%; border-collapse:collapse; font-size:13px}
+.bt-tbl th,.bt-tbl td{padding:8px 10px; border-bottom:1px solid var(--line); white-space:nowrap}
+.bt-tbl th{font-size:12px; color:var(--muted); text-align:left}
+.bt-tbl .r{text-align:right}
+.bt-tbl tr.tot td{font-weight:800; border-top:2px solid var(--line)}
+.bt-use{display:flex; align-items:center; gap:8px; min-width:160px}
+.bt-use .bar-track{flex:1; height:12px}
+.bt-use .pct{width:48px; text-align:right; font-weight:700; font-variant-numeric:tabular-nums}
+.bt-ok{background:var(--income)} .bt-warn{background:#e0a100} .bt-over{background:var(--expense)}
+.t-ok{color:var(--income)} .t-warn{color:#c98f00} .t-over{color:var(--expense)}
+.bt-dash{margin-bottom:20px; padding:14px 16px}
+.bt-dash .row{display:flex; align-items:center; gap:18px; flex-wrap:wrap}
+.bt-dash .big{font-size:24px; font-weight:800}
+.bt-dash .bar-track{height:14px}
+.bt-dash ul{margin:8px 0 0; padding-left:18px; font-size:13px}
+@media (max-width:760px){ .bt-kpis{grid-template-columns:1fr 1fr} .bt-tbl th:nth-child(2),.bt-tbl td:nth-child(2){display:none} }
+@media print{ #budTrack,#budPlan{display:block !important} }
 .callout{background:var(--accent-soft); border:1px solid var(--chip-line); border-radius:10px; padding:12px 14px; font-size:13px; color:var(--text)}
 .callout b{color:var(--accent)}
 code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padding:14px; border-radius:10px; font-size:12px; overflow:auto; margin-top:8px; border:1px solid #213351}
@@ -597,6 +624,8 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
 
       <div class="kpi-flow" id="kpiFlow"></div>
 
+      <div class="card bt-dash" id="budDash"></div>
+
       <div class="moves-h"><h3>Money moved</h3><span class="tiny">Your own money moving around. Each box says whether it counts as spending.</span></div>
       <div class="grid g3 moves" id="moveCards"></div>
 
@@ -750,6 +779,22 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
         </div>
         <div class="no-print"><button class="btn ghost" onclick="window.print()">🖨️ Print</button></div>
       </div>
+      <div class="btabs no-print" id="budTabs">
+        <button data-bt="track" onclick="setBudTab('track')">📊 Track spending</button>
+        <button data-bt="plan" onclick="setBudTab('plan')">✏️ Plan budget</button>
+      </div>
+
+      <div id="budTrack">
+        <div class="filters no-print">
+          <div class="fx"><label>Month</label><select class="field" id="btMonth" onchange="renderBudTrack()"></select></div>
+          <div class="fx"><label>Show</label><select class="field" id="btMode" onchange="renderBudTrack()">
+            <option value="month">This month only</option><option value="ytd">Year to date (Mar up to this month)</option></select></div>
+        </div>
+        <div class="bt-kpis" id="btKpis"></div>
+        <div id="btSections"></div>
+      </div>
+
+      <div id="budPlan">
       <div class="grid g3" style="margin-bottom:16px">
         <div class="card pad"><div class="tiny">Budgeted net / year</div><div class="num" id="budNet" style="font-size:22px; font-weight:800; margin-top:4px"></div></div>
         <div class="card pad"><div class="tiny">Actual net / year</div><div class="num" id="actNet" style="font-size:22px; font-weight:800; margin-top:4px"></div></div>
@@ -758,6 +803,7 @@ code.sql{display:block; white-space:pre; background:#0d1728; color:#cfe0ff; padd
       <div class="card">
         <div class="card-h"><h3>Budget planner</h3><span class="hint">Type a planned amount into any cell — it saves as you go</span></div>
         <div class="bwrap"><table class="budget-tbl" id="budgetTbl"></table></div>
+      </div>
       </div>
     </section>
 
@@ -1629,7 +1675,8 @@ function fmt0(n){
   const a=Math.round(Math.abs(Number(n)||0));
   return curSym()+' '+group(String(a));
 }
-function toast(msg,err){ const t=document.getElementById('toast'); t.textContent=msg; t.className='show'+(err?' err':''); setTimeout(()=>t.className='',2200); }
+let _toastT=null;
+function toast(msg,err,ms){ const t=document.getElementById('toast'); t.textContent=msg; t.className='show'+(err?' err':''); clearTimeout(_toastT); _toastT=setTimeout(()=>t.className='',ms||2200); }
 
 /* ---------- theme ---------- */
 function applyTheme(t){ document.documentElement.dataset.theme=t; document.getElementById('themeBtn').textContent = t==='dark'?'☀️':'🌙'; localStorage.setItem('theme',t); }
@@ -1719,6 +1766,7 @@ function renderDashboard(){
     </div>`).join('');
 
   renderMoves(rows);
+  renderBudDash();
 
   // monthly grouped chart (financial year order, Mar–Feb)
   const byM = FY.map(m=>{
@@ -2084,10 +2132,13 @@ function saveTxn(){
       allocation:'Loan interest', amount:interest, account:rec.account, person:rec.person, notes:rec.notes });
   }
   if(rec.amount<=0) { save(); closeTxn(); render(); toast('Interest saved'); return; }
+  const before=budUseFor(rec.date,rec.type,rec.allocation);
   if(editingId){ const i=state.transactions.findIndex(t=>t.id===editingId); state.transactions[i]=rec; }
   else state.transactions.push(rec);
   save(); closeTxn(); render();
-  toast(editingId?'Transaction updated':'Transaction saved');
+  const msg=budWarnMsg(before,budUseFor(rec.date,rec.type,rec.allocation),rec);
+  if(msg) toast(msg.text,msg.over,5000);
+  else toast(editingId?'Transaction updated':'Transaction saved');
 }
 
 /* ============================================================
@@ -3213,7 +3264,121 @@ function budKey(type,alloc,m){ return `${activeYear()}|${type}|${alloc}|${m}`; }
 function getBud(type,alloc,m){ return Number(state.budgets[budKey(type,alloc,m)])||0; }
 function setBud(type,alloc,m,v){ const k=budKey(type,alloc,m); if(v) state.budgets[k]=v; else delete state.budgets[k]; }
 
+/* ---------- Budget tracking (budget vs actual) ---------- */
+const BT_SPEND=['Expense','Debt Repayment','Deduction'];   // over budget = bad
+let budTab=null;
+function budOf(y,type,alloc,m){ return Number(state.budgets[`${y}|${type}|${alloc}|${m}`])||0; }
+function yearHasBudget(y){ const yp=y+'|'; return Object.keys(state.budgets||{}).some(k=>k.startsWith(yp)&&Number(state.budgets[k])); }
+function setBudTab(t){ budTab=t; renderBudget(); }
+function useCls(p){ return p>100?'over':p>=80?'warn':'ok'; }
+/* default month: today's month if it's in this year, otherwise the last month with transactions */
+function btDefaultMonth(y){
+  const t=todayISO(); if(fyStartOf(t)===Number(y)) return monthOf(t);
+  const used=new Set(yearTxns(y).map(x=>monthOf(x.date)));
+  for(let i=FY.length-1;i>=0;i--) if(used.has(FY[i])) return FY[i];
+  return FY[0];
+}
+/* budget, actual for one category over a list of months */
+function btCalc(y,type,alloc,months,rows){
+  const b=sum(months.map(m=>budOf(y,type,alloc,m)));
+  const a=sum(rows.filter(t=>t.type===type&&t.allocation===alloc&&months.includes(monthOf(t.date))).map(netAmt));
+  return {b,a};
+}
+function btSection(y,type,months,rows){
+  const yp=y+'|'+type+'|';
+  const fromBud=Object.keys(state.budgets).filter(k=>k.startsWith(yp)&&months.includes(k.split('|')[3])&&Number(state.budgets[k])).map(k=>k.split('|')[2]);
+  const fromAct=rows.filter(t=>t.type===type&&months.includes(monthOf(t.date))).map(t=>t.allocation);
+  const cats=[...new Set([...fromBud,...fromAct])];
+  return cats.map(c=>({c,...btCalc(y,type,c,months,rows)})).filter(r=>r.b||r.a);
+}
+function renderBudTrack(){
+  const y=activeYear(), ms=document.getElementById('btMonth');
+  if(!ms.options.length || ms.dataset.y!==String(y)){
+    ms.innerHTML=FY.map(m=>`<option>${m}</option>`).join(''); ms.value=btDefaultMonth(y); ms.dataset.y=String(y);
+  }
+  const m=ms.value, ytd=val('btMode')==='ytd';
+  const months=ytd?FY.slice(0,FY.indexOf(m)+1):[m];
+  const rows=yearTxns(y), label=ytd?`Mar – ${m}`:m;
+  const secs=[['Income','Income',false],['Deduction','Deductions',true],['Expense','Expenses',true],['Debt Repayment','Debt Repayments',true]];
+  let spendB=0,spendA=0,incB=0,incA=0,over=[],html='';
+  for(const [type,lab,spend] of secs){
+    const list=btSection(y,type,months,rows); if(!list.length) continue;
+    list.sort((p,q)=>(q.b?q.a/q.b:9e9)-(p.b?p.a/p.b:9e9));
+    let tb=0,ta=0,body='';
+    for(const r of list){
+      tb+=r.b; ta+=r.a;
+      const left=r.b-r.a, pct=r.b?r.a/r.b*100:0;
+      let cls, txt;
+      if(!r.b){ cls=spend?'over':'ok'; txt=spend?'<span class="pill expense">Not budgeted</span>':'<span class="pill income">Not budgeted</span>'; }
+      else{ cls=spend?useCls(pct):(pct>=100?'ok':pct>=80?'warn':'over');
+        txt=`<span class="bt-use"><span class="bar-track"><span class="bar-fill bt-${cls}" style="width:${Math.min(100,pct)}%"></span></span><span class="pct t-${cls}">${Math.round(pct)}%</span></span>`; }
+      if(spend && (left<0)) over.push({c:r.c,v:-left,nb:!r.b});
+      const leftTxt=spend?(left<0?`<span class="t-over">−${fmt0(-left)} over</span>`:fmt0(left))
+                         :(left>0?`<span class="t-warn">${fmt0(left)} still to come</span>`:`<span class="t-ok">+${fmt0(-left)}</span>`);
+      body+=`<tr><td>${esc(r.c)}</td><td class="r num">${fmt0(r.b)}</td><td class="r num">${fmt0(r.a)}</td><td class="r num">${leftTxt}</td><td>${txt}</td></tr>`;
+    }
+    if(spend){ if(type!=='Deduction'){ spendB+=tb; spendA+=ta; } } else { incB+=tb; incA+=ta; }
+    const tl=tb-ta;
+    html+=`<div class="card" style="margin-bottom:16px"><div class="card-h"><h3>${lab}</h3><span class="hint">${label}</span></div>
+      <div class="table-wrap"><table class="bt-tbl"><thead><tr><th>Category</th><th class="r">${spend?'Budget':'Expected'}</th><th class="r">${spend?'Spent':'Received'}</th><th class="r">${spend?'Left':'Difference'}</th><th>${spend?'Used':'Received'}</th></tr></thead>
+      <tbody>${body}<tr class="tot"><td>Total ${lab.toLowerCase()}</td><td class="r num">${fmt0(tb)}</td><td class="r num">${fmt0(ta)}</td><td class="r num">${spend?(tl<0?`<span class="t-over">−${fmt0(-tl)} over</span>`:fmt0(tl)):(tl>0?`<span class="t-warn">${fmt0(tl)} still to come</span>`:`<span class="t-ok">+${fmt0(-tl)}</span>`)}</td><td></td></tr></tbody></table></div></div>`;
+  }
+  const left=spendB-spendA, pct=spendB?spendA/spendB*100:0, cls=useCls(pct);
+  document.getElementById('btKpis').innerHTML=`
+    <div class="bt-kpi main"><div class="tiny">Left to spend · ${label}</div><div class="v num ${left<0?'t-over':'t-ok'}">${left<0?'−'+fmt0(-left):fmt0(left)}</div><div class="tiny">${left<0?'over budget':'of '+fmt0(spendB)+' budgeted'}</div></div>
+    <div class="bt-kpi"><div class="tiny">Spent (expenses + debt)</div><div class="v num">${fmt0(spendA)}</div><div class="tiny t-${cls}">${spendB?Math.round(pct)+'% of budget used':'No spending budget set'}</div></div>
+    <div class="bt-kpi"><div class="tiny">Income received</div><div class="v num">${fmt0(incA)}</div><div class="tiny">${incB?'Expected '+fmt0(incB):'No income budget set'}</div></div>
+    <div class="bt-kpi"><div class="tiny">Categories over budget</div><div class="v num ${over.length?'t-over':'t-ok'}">${over.length}</div><div class="tiny">${over.length?'See the red rows below':'Well done 👍'}</div></div>`;
+  document.getElementById('btSections').innerHTML = html ||
+    `<div class="card"><div class="empty"><div style="font-size:15px;font-weight:700;margin-bottom:6px">Nothing to track yet for ${label}</div>
+     <div class="tiny">Set your planned amounts under <b>✏️ Plan budget</b>, then add transactions. They will show here against your budget.</div>
+     <button class="btn sm" style="margin-top:12px" onclick="setBudTab('plan')">✏️ Plan budget</button></div></div>`;
+}
+/* Dashboard card: this month's budget */
+function renderBudDash(){
+  const el=document.getElementById('budDash'); if(!el) return;
+  const y=activeYear(), fm=val('fMonth');
+  const m=(fm&&fm!=='All'&&FY.includes(fm))?fm:btDefaultMonth(y), rows=yearTxns(y);
+  if(!yearHasBudget(y)){
+    el.innerHTML=`<div class="row"><div><b>📊 Budget tracking</b><div class="tiny">Set a monthly budget to see how much you have left to spend each month.</div></div>
+      <button class="btn ghost sm no-print" onclick="budTab='plan';goView('budget')">Set a budget</button></div>`; return;
+  }
+  let b=0,a=0; const over=[];
+  for(const type of ['Expense','Debt Repayment']){
+    for(const r of btSection(y,type,[m],rows)){ b+=r.b; a+=r.a; if(r.a>r.b) over.push({c:r.c,v:r.a-r.b}); }
+  }
+  over.sort((p,q)=>q.v-p.v);
+  const left=b-a, pct=b?a/b*100:0, cls=useCls(pct);
+  el.innerHTML=`<div class="row">
+      <div><div class="tiny">📊 Left to spend in ${m}</div><div class="big num ${left<0?'t-over':'t-ok'}">${left<0?'−'+fmt0(-left)+' over':fmt0(left)}</div></div>
+      <div style="flex:1;min-width:200px"><div class="tiny">${fmt0(a)} spent of ${fmt0(b)} budgeted · <b class="t-${cls}">${Math.round(pct)}%</b></div>
+        <span class="bar-track"><span class="bar-fill bt-${cls}" style="width:${Math.min(100,pct)}%"></span></span></div>
+      <button class="btn ghost sm no-print" onclick="budTab='track';goView('budget')">Open budget tracker</button>
+    </div>
+    ${over.length?`<ul>${over.slice(0,3).map(o=>`<li><b>${esc(o.c)}</b> is <span class="t-over">${fmt0(o.v)} over</span></li>`).join('')}${over.length>3?`<li class="tiny">and ${over.length-3} more</li>`:''}</ul>`:''}`;
+}
+/* used when a transaction is saved */
+function budUseFor(date,type,alloc){
+  if(!BT_SPEND.includes(type)||!date) return null;
+  const y=fyStartOf(date), m=monthOf(date), b=budOf(y,type,alloc,m);
+  if(!b) return null;
+  const a=sum(state.transactions.filter(t=>t.type===type&&t.allocation===alloc&&fyStartOf(t.date)===y&&monthOf(t.date)===m).map(netAmt));
+  return {b,a,m};
+}
+function budWarnMsg(before,after,rec){
+  if(!after) return null;
+  const pa=after.a/after.b*100, pb=before?before.a/before.b*100:0;
+  if(pa>100 && (pb<=100 || after.a>before.a)) return {over:true, text:`⚠ Saved. ${rec.allocation} is now ${fmt0(after.a-after.b)} over its ${after.m} budget`};
+  if(pa>=80 && pb<80) return {over:false, text:`Saved. You've used ${Math.round(pa)}% of your ${after.m} ${rec.allocation} budget`};
+  return null;
+}
+
 function renderBudget(){
+  if(!budTab) budTab=yearHasBudget(activeYear())?'track':'plan';
+  document.querySelectorAll('#budTabs button').forEach(b=>b.classList.toggle('on',b.dataset.bt===budTab));
+  document.getElementById('budTrack').style.display=budTab==='track'?'':'none';
+  document.getElementById('budPlan').style.display=budTab==='plan'?'':'none';
+  if(budTab==='track') renderBudTrack();
   const tbl=document.getElementById('budgetTbl');
   let html=`<thead><tr><th style="min-width:180px">Category</th>${FY.map(m=>`<th class="r">${m}</th>`).join('')}<th class="r">Total</th></tr></thead><tbody>`;
   const sections=[['Income','Income'],['Deduction','Deductions'],['Expense','Expenses'],['Debt Repayment','Debt Repayments'],['Transfer','Transfers and savings (for planning, not in the totals)']];
